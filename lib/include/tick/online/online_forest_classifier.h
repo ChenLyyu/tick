@@ -30,8 +30,10 @@
 // TODO: range computation std::pair<float, float> NodeClassifier::range(uint32_t j) const should be performed by collecting all the sample in the leaves....
 
 // 2019 / 03 / 05
-// TODO: nodes are never memorized, few of them are disposable !?!
-// TODO:
+// TODO: Code make_disposable, make_memory, make_computed in Tree
+// TODO: In node, only use these functions in copy constructor
+// TODO: add_node only creates nodes with no memory
+// TODO: _n_nodes_with_memory can increase and decrease. Don't these for n_samples in update_sample_type, test the memory remaining instead
 
 enum class CriterionClassifier {
   log = 0,

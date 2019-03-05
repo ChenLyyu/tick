@@ -3,28 +3,39 @@ from sklearn.model_selection import train_test_split
 from tick.online import OnlineForestClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.datasets import make_moons
+from sklearn.metrics import roc_auc_score
+from sklearn.datasets import make_moons, make_classification, make_circles
 
 # Utiliser pour compiler la premiere fois
 # LDFLAGS="-L/anaconda3/envs/py36/lib" ./sh/mkn.sh
 # puis utiliser
 # LDFLAGS="-L/anaconda3/envs/py36/lib" ./sh/mkn.sh online
 
-n_samples = 10
-n_features = 100
+n_samples = 30
+n_features = 5
 n_classes = 2
 
-X, y = make_moons(n_samples=n_samples, noise=0.3, random_state=0)
+# X, y = make_moons(n_samples=n_samples, noise=0.3, random_state=0)
 
-X_train, X_test, y_train, y_test = \
-    train_test_split(X, y, test_size=.3, random_state=42)
+X, y = make_classification(n_samples=n_samples, n_features=n_features,
+                           n_redundant=0, n_informative=2,
+                           random_state=42,
+                           n_clusters_per_class=1)
 
 
-of = OnlineForestClassifier(n_classes=2, n_trees=10, use_aggregation=False,
-                            split_pure=True, memory=512)
+# X_train, X_test, y_train, y_test = \
+#     train_test_split(X, y, test_size=.3, random_state=42)
+
+
+of = OnlineForestClassifier(n_classes=2, n_trees=1, use_aggregation=False,
+                            split_pure=True, memory=1, seed=123)
 
 
 of.partial_fit(X, y)
 
+# score = roc_auc_score(y_test, of.predict_proba(X_test)[:, 1])
+#
+# print("score: ", score)
 # of.print(0)
 
 # of.partial_fit(X, y)

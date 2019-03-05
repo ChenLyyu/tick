@@ -24,15 +24,25 @@
 
 
 // TODOs 2019 / 02 / 26
-// TODO: features_min and max allocated only if necessary
 // TODO: a tree must know how to add_node_memorized_range() a tree must now the latest node with memory
 // TODO: a tree must have a max_nodes_memorized_range and a n_nodes_memorized_range
 
+// TODO: range computation std::pair<float, float> NodeClassifier::range(uint32_t j) const should be performed by collecting all the sample in the leaves....
 
+// 2019 / 03 / 05
+// TODO: nodes are never memorized, few of them are disposable !?!
+// TODO:
 
 enum class CriterionClassifier {
   log = 0,
 };
+
+enum class RangeStatus {
+  computed = 0,
+  memorized = 1,
+  disposable = 2
+};
+
 
 enum class FeatureImportanceType { no = 0, estimated = 1, given = 2 };
 
@@ -80,7 +90,9 @@ class NodeClassifier {
   // (this allows to compute the range whenever the range memory is note used)
   std::vector<uint32_t> _samples;
 
-  bool _is_range_memorized;
+  RangeStatus _range_status;
+
+  // bool _is_range_memorized;
 
   // Update range of the seen features
   // void update_range(const ArrayFloat &x_t);
@@ -96,7 +108,7 @@ class NodeClassifier {
   NodeClassifier(const NodeClassifier &node);
   NodeClassifier(const NodeClassifier &&node);
   NodeClassifier &operator=(const NodeClassifier &);
-  NodeClassifier &operator=(const NodeClassifier &&) = delete;
+  NodeClassifier &operator=(const NodeClassifier &&);
 
   // Computation of log( (e^a + e^b) / 2) in an overproof way
   inline static float log_sum_2_exp(const float a, const float b) {
@@ -132,6 +144,10 @@ class NodeClassifier {
   // Get node at index in the tree
   inline NodeClassifier &node(uint32_t index) const;
 
+
+  // void update_range_type();
+  void memorize_range();
+
   // Get number of features
   inline uint32_t n_features() const;
   // Number of classes
@@ -146,8 +162,10 @@ class NodeClassifier {
   inline void increment_depth();
 
   std::pair<float, float> range(uint32_t j) const;
-  void memorize_range();
+  // void memorize_range();
   void forget_range();
+
+  void make_disposable();
 
   inline uint32_t parent() const;
   inline NodeClassifier &parent(uint32_t parent);
@@ -173,6 +191,9 @@ class NodeClassifier {
   inline float weight_tree() const;
   inline const ArrayFloat& sample_features(uint32_t index) const;
   inline float sample_label(uint32_t index) const;
+
+  inline RangeStatus range_status() const { return _range_status; }
+  inline void range_status(RangeStatus range_status_) { _range_status = range_status_; }
 };
 
 class OnlineForestClassifier;
@@ -195,6 +216,13 @@ class TreeClassifier {
   uint32_t iteration = 0;
   // Nodes of the tree
   std::vector<NodeClassifier> nodes = std::vector<NodeClassifier>();
+
+  std::stack<uint32_t> disposable_nodes = std::stack<uint32_t>();
+  //
+  uint32_t _n_nodes_with_memorized_range = 0;
+  // True if we cannot create new nodes with range memory or memorize the range of an existing one
+  bool _is_memory_filled = false;
+  uint32_t _worse_node_with_memorized_range;
 
   // Create the root node
   void create_root();
@@ -220,14 +248,16 @@ class TreeClassifier {
 
   // void split_node(uint32_t node_index, uint32_t sample, const ArrayFloat &intensities);
 
+  void update_range_type(uint32_t node_index);
+
   void update_depth(uint32_t node_index, uint8_t depth);
 
  public:
   explicit TreeClassifier(OnlineForestClassifier &forest);
   TreeClassifier(const TreeClassifier &tree);
   TreeClassifier(const TreeClassifier &&tree);
-  TreeClassifier &operator=(const TreeClassifier &) = delete;
-  TreeClassifier &operator=(const TreeClassifier &&) = delete;
+  TreeClassifier &operator=(const TreeClassifier &);
+  TreeClassifier &operator=(const TreeClassifier &&);
 
   // Reserve nodes in the tree in advance
   void reserve_nodes(uint32_t n_nodes);
@@ -242,9 +272,14 @@ class TreeClassifier {
   // Get the path of x_t
   void get_path(const ArrayFloat &x_t, SArrayUIntPtr path);
 
-  //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
+  // bool is_memorizable(const NodeClassifier& node);
+
+
+
+    //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
   //                          SArrayFloatPtr  aggregation_weights);
 
+  void make_disponable(uint32_t node);
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;
   inline uint32_t n_nodes() const;
@@ -264,9 +299,15 @@ class TreeClassifier {
   inline const ArrayFloat& sample_features(uint32_t index) const;
   inline float sample_label(uint32_t index) const;
 
+  void incr_n_nodes_with_memorized_range();
+
+  inline uint32_t n_disponable_nodes() const { return static_cast<uint32_t>(disposable_nodes.size()); }
+
   NodeClassifier &node(uint32_t index) { return nodes[index]; }
 
   inline ArrayFloat &feature_importances() { return feature_importances_; }
+
+  inline bool is_memory_filled() const { return _is_memory_filled; }
 
   inline uint32_t max_nodes_with_memory() const;
 
@@ -286,6 +327,8 @@ class TreeClassifier {
                       SArrayUIntPtr nodes_sample,
                       SArrayFloatPtr nodes_weight, SArrayFloatPtr nodes_weight_tree,
                       SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts);
+
+  void inspect_nodes_memory() const;
 };
 
 /*********************************************************************************
@@ -430,6 +473,8 @@ class OnlineForestClassifier {
                       SArrayUIntPtr nodes_sample,
                       SArrayFloatPtr nodes_weight, SArrayFloatPtr nodes_weight_tree,
                       SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts);
+
+
 };
 
 #endif  // LIB_INCLUDE_TICK_ONLINE_ONLINE_FOREST_CLASSIFIER_H_

@@ -85,13 +85,15 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   _weight_tree = node._weight_tree;
   _is_leaf = node._is_leaf;
   _counts = node._counts;
-  _range_status = node._range_status;
-  // TODO: is this line for real ?
 
-  if(_range_status != RangeStatus::computed) {
+  if( (_range_status == RangeStatus::computed) && node.range_status() != RangeStatus::computed) {
     // We create an extra node with memorized range whenever this node has memory
     _tree.incr_n_nodes_with_memorized_range();
   }
+
+  _range_status = node._range_status;
+  // TODO: is this line for real ?
+
   return *this;
 }
 
@@ -345,7 +347,7 @@ inline NodeClassifier &NodeClassifier::depth(uint8_t depth) {
 
 // inline float NodeClassifier::features_max(const uint32_t j) const { return _features_max[j]; }
 
-inline uint32_t NodeClassifier::n_samples() const { return _n_samples; }
+
 
 inline bool NodeClassifier::use_aggregation() const { return _tree.use_aggregation(); }
 
@@ -431,7 +433,7 @@ void NodeClassifier::memorize_range() {
       std::cout << "NodeClassifier::memorize_range()" << std::endl;
       _memory_range_min = std::vector<float>(n_features());
       _memory_range_max = std::vector<float>(n_features());
-      _tree.incr_n_nodes_with_memorized_range();
+      // _tree.incr_n_nodes_with_memorized_range();
       _range_status = RangeStatus::memorized;
     }
     // First, copy the first sample into the range
@@ -473,6 +475,7 @@ TreeClassifier::TreeClassifier(OnlineForestClassifier &forest)
   intensities = ArrayFloat(_n_features);
   // TODO: initialization might be important
   feature_importances_.fill(1.);
+
 }
 
 
@@ -656,15 +659,16 @@ void TreeClassifier::update_range_type(uint32_t node_index) {
       if (disposable_nodes.empty()) {
         if (node.range_status() != RangeStatus::computed) {
           // There is no available disposable node and node has memory -> we make it disposable
-          disposable_nodes.push(node_index);
+          disposable_nodes.insert(node_index);
           node.range_status(RangeStatus::disposable);
         }
       } else {
-        NodeClassifier& disposable_node = nodes[disposable_nodes.top()];
+
+        NodeClassifier& disposable_node = nodes[*disposable_nodes.begin()];
         if(disposable_node.n_samples() < node.n_samples()) {
           // The disposable node has less samples than node --> we dispose of it and give range memory to node
           disposable_node.forget_range();
-          disposable_nodes.pop();
+          // disposable_nodes.pop();
           node.memorize_range();
           // The memory remained constant. We give memory of disposable node to a node with more samples
           // At some point there will be no more disposable nodes
@@ -672,7 +676,7 @@ void TreeClassifier::update_range_type(uint32_t node_index) {
           // The disposable node has more samples than node: we don't give memory to node, and make it disposable if it
           // has memory
           if (node.range_status() == RangeStatus::memorized) {
-            disposable_nodes.push(node_index);
+            disposable_nodes.insert(node_index);
             node.range_status(RangeStatus::disposable);
           }
         }
@@ -683,14 +687,14 @@ void TreeClassifier::update_range_type(uint32_t node_index) {
       node.memorize_range();
       if (disposable_nodes.empty()) {
         // If there is no disposable node: we add node
-        disposable_nodes.push(node_index);
+        disposable_nodes.insert(node_index);
         node.range_status(RangeStatus::disposable);
       } else {
-        uint32_t last_disposable_node = disposable_nodes.top();
+        uint32_t last_disposable_node = *disposable_nodes.begin();
         if (nodes[last_disposable_node].n_samples() > node.n_samples()) {
           // If the last node inserted has more samples than node, node can be made disposable.
           // n_samples of a node is always increasing: disposable_nodes cannot contain duplicates
-          disposable_nodes.push(node_index);
+          disposable_nodes.insert(node_index);
           node.range_status(RangeStatus::disposable);
         }
       }
@@ -702,10 +706,74 @@ void TreeClassifier::update_range_type(uint32_t node_index) {
   // std::cout << "  [OUT] TreeClassifier::update_range_type(uint32_t node_index) " << std::endl;
 }
 
-
-void TreeClassifier::make_disponable(uint32_t node) {
-  disposable_nodes.push(node);
+void TreeClassifier::make_computed(uint32_t node_index) {
+  NodeClassifier& node = nodes[node_index];
+  switch(node.range_status()) {
+    case RangeStatus::computed: {
+      // Nothing to do here
+      break;
+    }
+    case RangeStatus::memorized: {
+      node.forget_range();
+      _n_nodes_memorized--;
+      _n_nodes_computed++;
+      break;
+    }
+    case RangeStatus::disposable: {
+      node.forget_range();
+      disposable_nodes.erase(node_index);
+      _n_nodes_disposable--;
+      _n_nodes_computed++;
+      break;
+    }
+  }
 }
+
+void TreeClassifier::make_memorized(uint32_t node_index) {
+  NodeClassifier& node = nodes[node_index];
+  switch(node.range_status()) {
+    case RangeStatus::computed: {
+      node.memorize_range();
+      _n_nodes_computed--;
+      _n_nodes_memorized++;
+      break;
+    }
+    case RangeStatus::memorized: {
+      // Nothing to do here
+      break;
+    }
+    case RangeStatus::disposable: {
+      disposable_nodes.erase(node_index);
+      _n_nodes_disposable--;
+      _n_nodes_memorized++;
+      break;
+    }
+  }
+}
+
+void TreeClassifier::make_disposable(uint32_t node_index) {
+  NodeClassifier& node = nodes[node_index];
+  switch(node.range_status()) {
+    case RangeStatus::computed: {
+      node.memorize_range();
+      disposable_nodes.insert(node_index);
+      _n_nodes_computed--;
+      _n_nodes_disposable++;
+      break;
+    }
+    case RangeStatus::memorized: {
+      disposable_nodes.insert(node_index);
+      _n_nodes_memorized--;
+      _n_nodes_disposable++;
+      break;
+    }
+    case RangeStatus::disposable: {
+      // Nothing to do here
+      break;
+    }
+  }
+}
+
 
 float TreeClassifier::compute_split_time(uint32_t node_index, uint32_t sample) {
   NodeClassifier &current_node = node(node_index);
@@ -1091,6 +1159,12 @@ void TreeClassifier::inspect_nodes_memory() const {
     }
   }
   std::cout << "computed: " << n_computed << ", memorized: " << n_memory << ", disposable: " << n_disposable << std::endl;
+
+  for (std::set<uint32_t, TreeClassifier::NodeCompare>::iterator it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
+    std::cout << nodes[*it].n_samples() << ", ";
+  }
+  std::cout << std::endl;
+
 }
 
 

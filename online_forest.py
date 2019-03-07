@@ -11,7 +11,8 @@ from sklearn.datasets import make_moons, make_classification, make_circles
 # puis utiliser
 # LDFLAGS="-L/anaconda3/envs/py36/lib" ./sh/mkn.sh online
 
-n_samples = 500
+# n_samples = 500
+n_samples = 50
 n_features = 5
 n_classes = 2
 

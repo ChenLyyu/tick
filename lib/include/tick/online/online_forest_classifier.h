@@ -187,7 +187,7 @@ class NodeClassifier {
   inline NodeClassifier &depth(uint8_t depth);
   // inline float features_min(const uint32_t j) const;
   // inline float features_max(const uint32_t j) const;
-  inline uint32_t n_samples() const;
+  inline uint32_t n_samples() const { return _n_samples; };
   inline bool use_aggregation() const;
   inline float weight() const;
   inline float weight_tree() const;
@@ -204,6 +204,7 @@ class OnlineForestClassifier;
  * TreeClassifier
  *********************************************************************************/
 
+
 class TreeClassifier {
  protected:
   // The forest of the tree
@@ -219,9 +220,30 @@ class TreeClassifier {
   // Nodes of the tree
   std::vector<NodeClassifier> nodes = std::vector<NodeClassifier>();
 
-  std::stack<uint32_t> disposable_nodes = std::stack<uint32_t>();
+  // std::stack<uint32_t> disposable_nodes = std::stack<uint32_t>();
+
+  struct NodeCompare {
+
+    const std::vector<NodeClassifier> * const nodes_ptr;
+
+    NodeCompare(std::vector<NodeClassifier> &nodes) : nodes_ptr(&nodes) {};
+
+    bool operator()(uint32_t node1_index, uint32_t node2_index) const {
+      return (*nodes_ptr)[node1_index].n_samples() < (*nodes_ptr)[node2_index].n_samples();
+    }
+  };
+
+  // This one is nasty: it will contain nodes more or less ordered by their n_samples (not guaranteed,
+  // since n_samples is always increasing)
+  std::set<uint32_t, NodeCompare> disposable_nodes = std::set<uint32_t, NodeCompare>(NodeCompare(nodes));
+
   //
   uint32_t _n_nodes_with_memorized_range = 0;
+
+  uint32_t _n_nodes_memorized = 0;
+  uint32_t _n_nodes_computed = 0;
+  uint32_t _n_nodes_disposable = 0;
+
   // True if we cannot create new nodes with range memory or memorize the range of an existing one
   bool _is_memory_filled = false;
   uint32_t _worse_node_with_memorized_range;
@@ -281,7 +303,10 @@ class TreeClassifier {
     //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
   //                          SArrayFloatPtr  aggregation_weights);
 
-  void make_disponable(uint32_t node);
+  void make_disposable(uint32_t node_index);
+  void make_memorized(uint32_t node_index);
+  void make_computed(uint32_t node_index);
+
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;
   inline uint32_t n_nodes() const;

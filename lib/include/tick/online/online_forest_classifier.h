@@ -37,16 +37,22 @@
 
 // 2019 / 03 / 11
 
-// TODO: remove RangeType::memory, and replace disposable by memorized
 // TODO: use std::multimap to map n_samples to node_index and std::map to map node_index to n_samples. A node must always increment this itself
 // TODO: this would solve the problem with std::map with a crazy order
+
+// TODO: _n_
 
 enum class CriterionClassifier {
   log = 0,
 };
 
 
-
+/*
+std::ostream& operator<<(std::ostream &os, const std::pair<uint32_t, uint32_t>& p) {
+  os << "(" << p.first << ", " << p.second << ")";
+  return os;
+}
+*/
 
 enum class FeatureImportanceType { no = 0, estimated = 1, given = 2 };
 
@@ -173,6 +179,7 @@ class NodeClassifier {
   // void dispose_range();
 
   inline uint32_t index() const { return _index; };
+  inline NodeClassifier & index(uint32_t idx) { _index=idx; return *this; };
   inline uint32_t parent() const;
   inline NodeClassifier &parent(uint32_t parent);
   inline uint32_t left() const;
@@ -226,6 +233,7 @@ class TreeClassifier {
 
   // std::stack<uint32_t> disposable_nodes = std::stack<uint32_t>();
 
+  /*
   struct NodeCompare {
 
     const std::vector<NodeClassifier> * const nodes_ptr;
@@ -240,12 +248,17 @@ class TreeClassifier {
 
     }
   };
+   */
 
   // This one is nasty: it will contain nodes more or less ordered by their n_samples (not guaranteed,
   // since n_samples is always increasing)
-  std::multiset<uint32_t, NodeCompare> disposable_nodes = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
-
+  // std::multiset<uint32_t, NodeCompare> disposable_nodes = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
+  // = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
   // uint32_t _n_nodes_with_memorized_range = 0;
+
+
+  // Nodes with memorized range are saved as pairs containing (n_samples, node_index)
+  std::set<std::pair<uint32_t, uint32_t>> disposable_nodes;
 
   uint32_t _n_nodes_memorized = 0;
   uint32_t _n_nodes_computed = 0;
@@ -305,7 +318,7 @@ class TreeClassifier {
 
   // bool is_memorizable(const NodeClassifier& node);
 
-
+  void incr_n_samples(uint32_t node_index);
 
     //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
   //                          SArrayFloatPtr  aggregation_weights);

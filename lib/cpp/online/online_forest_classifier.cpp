@@ -6,36 +6,19 @@
  * NodeClassifier methods
  *********************************************************************************/
 
-std::ostream& operator << (std::ostream& os, const RangeStatus& obj) {
-  switch(obj) {
-    case RangeStatus::computed: {
-      os << "computed";
-      break;
-    }
-    case RangeStatus::memorized: {
-      os << "memorized";
-      break;
-    }
-    case RangeStatus::disposable: {
-      os << "disposable";
-      break;
-    }
-  }
-  return os;
-}
+
 
 NodeClassifier::NodeClassifier(TreeClassifier &tree, uint32_t index, uint32_t parent, float time)
     : _tree(tree),
       _index(index),
       _parent(parent),
       _time(time),
-      _counts(tree.n_classes()),
-      _range_status(RangeStatus::computed) {
+      _counts(tree.n_classes()) {
   _counts.fill(0);
   _samples = std::vector<uint32_t>();
   _memory_range_min = std::vector<float>();
   _memory_range_max = std::vector<float>();
-  std::cout << "  NodeClassifier::NodeClassifier(TreeClassifier &tree, uint32_t parent, float time)" << std::endl;
+  // std::cout << "  NodeClassifier::NodeClassifier(TreeClassifier &tree, uint32_t parent, float time)" << std::endl;
 }
 
 
@@ -58,14 +41,14 @@ NodeClassifier::NodeClassifier(const NodeClassifier &node)
       _memory_range_min(node._memory_range_min),
       _memory_range_max(node._memory_range_max),
       _samples(node._samples),
-      _range_status(node._range_status) {
-  std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &node)" << std::endl;
+      _memorized(node._memorized) {
+  // std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &node)" << std::endl;
 }
 
 
 NodeClassifier::NodeClassifier(const NodeClassifier &&node)
     : _tree(node._tree) {
-  std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &&node)" << std::endl;
+  // std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &&node)" << std::endl;
   _index = node._index;
   _parent = node._parent;
   _left = node._left;
@@ -84,13 +67,13 @@ NodeClassifier::NodeClassifier(const NodeClassifier &&node)
   _is_leaf = node._is_leaf;
   _counts = node._counts;
   // _is_range_memorized = node._is_range_memorized;
-  _range_status = node._range_status;
+  _memorized = node._memorized;
 }
 
 
 NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   // _tree = node._tree;
-  std::cout << "  NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node)" << std::endl;
+  // std::cout << "  NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node)" << std::endl;
   // std::cout << "now: " << _range_status << ", then: " << node._range_status << std::endl;
   _index = node._index;
   _parent = node._parent;
@@ -109,6 +92,8 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   _weight_tree = node._weight_tree;
   _is_leaf = node._is_leaf;
   _counts = node._counts;
+  _memorized = node._memorized;
+
 
   /*
   switch (_range_status) {
@@ -172,7 +157,6 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   }
    */
 
-  _range_status = node._range_status;
 
   /*
   if( (_range_status == RangeStatus::computed) && node.range_status() != RangeStatus::computed) {
@@ -182,7 +166,6 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
    */
 
 
-  // TODO: is this line for real ?
 
   return *this;
 }
@@ -274,7 +257,8 @@ void NodeClassifier::update_downwards(uint32_t sample, bool do_update_weight) {
   // std::cout << "float y_t = sample_label(sample);" << std::endl;
 
   // this->print();
-  if (_range_status != RangeStatus::computed) {
+
+  if (_memorized) {
     // There is already a sample, and we are updating with a new one: we can memorize the range
     // memorize_range();
     // update_range_type();
@@ -476,7 +460,9 @@ std::pair<float, float> NodeClassifier::range(uint32_t j) const {
     TICK_ERROR("Node has no range since it has no samples")
     // return std::pair<float, float>(0, 0);
   } else {
-    if (_range_status == RangeStatus::computed) {
+    if (_memorized) {
+      return std::pair<float, float>(_memory_range_min[j], _memory_range_max[j]);
+    } else {
       if (_n_samples == 1) {
         uint32_t sample = _samples.front();
         float feature_j = sample_features(sample)[j];
@@ -498,95 +484,64 @@ std::pair<float, float> NodeClassifier::range(uint32_t j) const {
         // std::cout << "  [OUT 2] NodeClassifier::range(uint32_t j)" << std::endl;
         return std::pair<float, float>(range_min, range_max);
       }
-    } else {
-      return std::pair<float, float>(_memory_range_min[j], _memory_range_max[j]);
     }
   }
 }
 
 
 void NodeClassifier::forget_range() {
-  if (_range_status != RangeStatus::computed) {
+  if (_memorized) {
     _memory_range_min.clear();
     _memory_range_max.clear();
-    _range_status = RangeStatus::computed;
+    _memorized = false;
   }
 }
 
 void NodeClassifier::memorize_range() {
   // std::cout << "void NodeClassifier::memorize_range() {" << std::endl;
-  switch(_range_status) {
-    case RangeStatus::computed: {
-      // std::cout << "  case RangeStatus::computed:" << std::endl;
-      if (_memory_range_min.empty()) {
-        // std::cout << "  _memory_range_min.empty()" << std::endl;
-        // TODO: new one or reserve ?
-        // _memory_range_min.reserve(n_features());
-        _memory_range_min = std::vector<float>(n_features());
-        _memory_range_max = std::vector<float>(n_features());
-        // std::cout << "  [OUT] _memory_range_min.empty()" << std::endl;
-      }
+  if (_memorized) {
+    // Nothing to do here
+  } else {
+    // std::cout << "  case RangeStatus::computed:" << std::endl;
+    if (_memory_range_min.empty()) {
+      // std::cout << "  _memory_range_min.empty()" << std::endl;
+      // TODO: new one or reserve ?
+      // _memory_range_min.reserve(n_features());
+      _memory_range_min = std::vector<float>(n_features());
+      _memory_range_max = std::vector<float>(n_features());
+      // std::cout << "  [OUT] _memory_range_min.empty()" << std::endl;
+    }
 
-      // TODO: THIS IS BAAAAAD....
-      if(!_samples.empty()) {
-        // First, copy the first sample into the range
-        // std::cout << "  Copy data 1" << std::endl;
-        float *begin = sample_features(_samples.front()).data();
-        float *end = begin + n_features();
-        std::copy(begin, end, _memory_range_min.begin());
-        std::copy(begin, end, _memory_range_max.begin());
-        // std::cout << "  OUT Copy data 1" << std::endl;
-        // Then, update the range using the rest of the points
-        // std::cout << "  Copy data samples" << std::endl;
-        for(auto sample_iter= std::next(_samples.begin()); sample_iter != _samples.end(); ++sample_iter) {
-          const ArrayFloat & x_t = sample_features(*sample_iter);
-          for (uint32_t j=0; j < n_features(); ++j) {
-            float x_tj = x_t[j];
-            if (x_tj < _memory_range_min[j]) {
-              _memory_range_min[j] = x_tj;
-            }
-            if (x_tj > _memory_range_max[j]) {
-              _memory_range_max[j] = x_tj;
-            }
+    // TODO: THIS IS BAAAAAD....
+    if(!_samples.empty()) {
+      // First, copy the first sample into the range
+      // std::cout << "  Copy data 1" << std::endl;
+      float *begin = sample_features(_samples.front()).data();
+      float *end = begin + n_features();
+      std::copy(begin, end, _memory_range_min.begin());
+      std::copy(begin, end, _memory_range_max.begin());
+      // std::cout << "  OUT Copy data 1" << std::endl;
+      // Then, update the range using the rest of the points
+      // std::cout << "  Copy data samples" << std::endl;
+      for(auto sample_iter= std::next(_samples.begin()); sample_iter != _samples.end(); ++sample_iter) {
+        const ArrayFloat & x_t = sample_features(*sample_iter);
+        for (uint32_t j=0; j < n_features(); ++j) {
+          float x_tj = x_t[j];
+          if (x_tj < _memory_range_min[j]) {
+            _memory_range_min[j] = x_tj;
+          }
+          if (x_tj > _memory_range_max[j]) {
+            _memory_range_max[j] = x_tj;
           }
         }
       }
-      // std::cout << "  OUT Copy data samples" << std::endl;
-      _range_status = RangeStatus::memorized;
-      break;
     }
-    case RangeStatus::memorized: {
-      // std::cout << "  case RangeStatus::memorized:" << std::endl;
-      // Nothing to do here
-      break;
-    }
-    case RangeStatus::disposable: {
-      // std::cout << "  case RangeStatus::disposable:" << std::endl;
-      _range_status = RangeStatus::memorized;
-      break;
-    }
+    // std::cout << "  OUT Copy data samples" << std::endl;
+    _memorized = true;
   }
   // std::cout << "    [OUT] void NodeClassifier::memorize_range() {" << std::endl;
 }
 
-
-void NodeClassifier::dispose_range() {
-  switch(_range_status) {
-    case RangeStatus::computed: {
-      memorize_range();
-      _range_status = RangeStatus::disposable;
-      break;
-    }
-    case RangeStatus::memorized: {
-      _range_status = RangeStatus::disposable;
-      break;
-    }
-    case RangeStatus::disposable: {
-      // Nothing to do here
-      break;
-    }
-  }
-}
 
 
 /*********************************************************************************
@@ -644,7 +599,7 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
   // following the Mondrian process definition.
   // Index of the root is 0
 
-  std::cout << "uint32_t TreeClassifier::go_downwards(uint32_t sample)" << std::endl;
+  // std::cout << "uint32_t TreeClassifier::go_downwards(uint32_t sample)" << std::endl;
   uint32_t index_current_node = 0;
   bool is_leaf = false;
   const ArrayFloat& x_t = sample_features(sample);
@@ -670,7 +625,7 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
       // std::cout << "iteration: " << iteration;
       // std::cout << ", split_time: " << split_time << std::endl;
 
-      std::cout << "  split_time: " << split_time << std::endl;
+      // std::cout << "  split_time: " << split_time << std::endl;
       if (split_time > 0) {
         NodeClassifier &current_node = node(index_current_node);
         // We split the current node: because the current node is a leaf, or
@@ -703,7 +658,7 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
         NodeClassifier &current_node_again = node(index_current_node);
         // current_node_again.update_downwards(x_t, y_t, true);
 
-        std::cout << "  update_range_type(index_current_node);  1" << std::endl;
+        // std::cout << "  update_range_type(index_current_node);  1" << std::endl;
         update_range_type(index_current_node);
         current_node_again.update_downwards(sample, true);
 
@@ -727,7 +682,7 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
         NodeClassifier &leaf = node(index_current_node);
         // Let's update the leaf containing the point
         // leaf.update_downwards(x_t, y_t, false);
-        std::cout << "  update_range_type(index_current_node);  2" << std::endl;
+        // std::cout << "  update_range_type(index_current_node);  2" << std::endl;
         update_range_type(index_current_node);
         leaf.update_downwards(sample, false);
         return index_current_node;
@@ -736,7 +691,7 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
         NodeClassifier &current_node = node(index_current_node);
         // current_node.update_downwards(x_t, y_t, true);
 
-        std::cout << "  update_range_type(index_current_node);  3" << std::endl;
+        // std::cout << "  update_range_type(index_current_node);  3" << std::endl;
         update_range_type(index_current_node);
         current_node.update_downwards(sample, true);
         is_leaf = current_node.is_leaf();
@@ -782,188 +737,65 @@ void TreeClassifier::update_range_type(uint32_t node_index) {
   NodeClassifier &node = nodes[node_index];
   uint32_t n_samples = node.n_samples();
 
-  std::cout << "TreeClassifier::update_range_type, n_samples: " << n_samples << std::endl;
+  // std::cout << "TreeClassifier::update_range_type, n_samples: " << n_samples << std::endl;
 
   if (n_samples >= 2) {
     // If node has less than 2 samples, its range status remains computed
-
-    if (_n_nodes_memorized + _n_nodes_disposable >= max_nodes_with_memory()) {
-      std::cout << "_n_nodes_memorized: " << _n_nodes_memorized;
-      std::cout << ", _n_nodes_disposable: " << _n_nodes_disposable;
-      std::cout << ", max_nodes_with_memory(): " << max_nodes_with_memory() << std::endl;
+    if (_n_nodes_memorized >= max_nodes_with_memory()) {
+      // std::cout << "_n_nodes_memorized: " << _n_nodes_memorized;
+      // std::cout << ", max_nodes_with_memory(): " << max_nodes_with_memory() << std::endl;
       // We reached the maximum memory of the tree
-      switch (node.range_status()) {
-        case RangeStatus::computed: {
-          uint32_t worst_node_index = *disposable_nodes.begin();
-          const NodeClassifier &worst_node = nodes[worst_node_index];
-          if (node.n_samples() > worst_node.n_samples()) {
-            // If node  has more sample than the worst disposable one, we make this worst node computed
-            // and make node disposable
-
-            std::cout << "  (node.n_samples() > worst_node.n_samples())" << std::endl;
-            std::cout << "  make_computed(worst_node_index);" << std::endl;
-            make_computed(worst_node_index);
-            std::cout << "  make_disposable(node_index);" << std::endl;
-            make_disposable(node_index);
-          }
-          break;
-        }
-        case RangeStatus::memorized: {
-          make_disposable(node_index);
-          break;
-        }
-        case RangeStatus::disposable: {
-          break;
+      if (node.memorized()) {
+        // TODO: there's something to do here..
+      } else {
+        uint32_t worst_node_index = *disposable_nodes.begin();
+        const NodeClassifier &worst_node = nodes[worst_node_index];
+        if (node.n_samples() > worst_node.n_samples()) {
+          // If node  has more sample than the worst disposable one, we make this worst node computed
+          // and make node disposable
+          // std::cout << "  (node.n_samples() > worst_node.n_samples())" << std::endl;
+          // std::cout << "  make_computed(worst_node_index);" << std::endl;
+          make_computed(worst_node_index);
+          // std::cout << "  make_memorized(node_index);" << std::endl;
+          make_memorized(node_index);
         }
       }
     } else {
-      // We still have memory in the tree
-      switch (node.range_status()) {
-        case RangeStatus::computed: {
-          make_disposable(node_index);
-          break;
-        }
-        case RangeStatus::memorized: {
-          make_disposable(node_index);
-          break;
-        }
-        case RangeStatus::disposable: {
-          // Nothing to do here
-          break;
-        }
-      }
+      make_memorized(node_index);
     }
   }
 }
 
 
 void TreeClassifier::make_computed(uint32_t node_index) {
-  std::cout << "void TreeClassifier::make_computed(uint32_t node_index) {" << std::endl;
+  // std::cout << "void TreeClassifier::make_computed(uint32_t node_index) {" << std::endl;
   NodeClassifier& node = nodes[node_index];
-  switch(node.range_status()) {
-    case RangeStatus::computed: {
-      std::cout << "  RangeStatus::computed:" << std::endl;
-      // Nothing to do here
-      break;
-    }
-    case RangeStatus::memorized: {
-      std::cout << "  RangeStatus::memorized:" << std::endl;
-      node.forget_range();
-      _n_nodes_memorized--;
-      _n_nodes_computed++;
-      break;
-    }
-    case RangeStatus::disposable: {
-      std::cout << "  RangeStatus::disposable:" << std::endl;
-      node.forget_range();
-      std::cout << "  disposable_nodes.size(): " << disposable_nodes.size() << std::endl;
-      std::cout << "disposable_nodes: ";
-      for (auto it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-        std::cout << *it << ", ";
-      }
-      std::cout << "disposable_nodes.erase(node_index); node_index: " << node_index << std::endl;
-      disposable_nodes.erase(node_index);
-      std::cout << "  disposable_nodes.size(): " << disposable_nodes.size() << std::endl;
-      for (auto it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-        std::cout << *it << ", ";
-      }
-      _n_nodes_disposable--;
-      _n_nodes_computed++;
-      // std::cout << "  _n_nodes_disposable: " << disposable_nodes.size() << std::endl;
-      break;
-    }
+  if (node.memorized()) {
+    node.forget_range();
+    //std::cout << "  disposable_nodes.size(): " << disposable_nodes.size() << std::endl;
+    //std::cout << "disposable_nodes: ";
+    //for (auto it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
+    //  std::cout << *it << ", ";
+    //}
+    //std::cout << "disposable_nodes.erase(node_index); node_index: " << node_index << std::endl;
+    disposable_nodes.erase(node_index);
+    //std::cout << "  disposable_nodes.size(): " << disposable_nodes.size() << std::endl;
+    //for (auto it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
+    //  std::cout << *it << ", ";
+    //}
+    _n_nodes_memorized--;
+    _n_nodes_computed++;
+
   }
 }
 
 void TreeClassifier::make_memorized(uint32_t node_index) {
   NodeClassifier& node = nodes[node_index];
-  switch(node.range_status()) {
-    case RangeStatus::computed: {
-      node.memorize_range();
-      _n_nodes_computed--;
-      _n_nodes_memorized++;
-      break;
-    }
-    case RangeStatus::memorized: {
-      // Nothing to do here
-      break;
-    }
-    case RangeStatus::disposable: {
-      // This will just change node._range_type
-      node.memorize_range();
-      disposable_nodes.erase(node_index);
-      _n_nodes_disposable--;
-      _n_nodes_memorized++;
-      break;
-    }
-  }
-}
-
-void TreeClassifier::make_disposable(uint32_t node_index) {
-  NodeClassifier& node = nodes[node_index];
-  switch(node.range_status()) {
-    case RangeStatus::computed: {
-      node.dispose_range();
-      // bool inserted;
-      // std::tie(std::ignore, inserted) = disposable_nodes.insert(node_index);
-
-//      std::cout << "case RangeStatus::computed:" << std::endl;
-//      std::cout << "node_index: " << node_index << std::endl;
-//      std::cout << "disposable_nodes: ";
-//      for (auto it=disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-//        std::cout << *it << ", ";
-//      }
-//      std::cout << std::endl;
-//
-//      std::cout << "disposable_nodes.insert(node_index);" << std::endl;
-      disposable_nodes.insert(node_index);
-
-//      std::cout << "disposable_nodes: ";
-//      for (auto it=disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-//        std::cout << *it << ", ";
-//      }
-//      std::cout << std::endl;
-//
-//      std::cout << "  [OUT] disposable_nodes.insert(node_index);" << std::endl;
-      // std::cout << "inserted: " << inserted << std::endl;
-      _n_nodes_computed--;
-      _n_nodes_disposable++;
-      break;
-    }
-    case RangeStatus::memorized: {
-      node.dispose_range();
-      // bool inserted;
-      // std::tie(std::ignore, inserted) = disposable_nodes.insert(node_index);
-//      std::cout << "case RangeStatus::memorized:" << std::endl;
-//      std::cout << "node_index: " << node_index << std::endl;
-//      std::cout << "disposable_nodes: ";
-//      for (auto it=disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-//        std::cout << *it << ", ";
-//      }
-//      std::cout << std::endl;
-//      std::cout << "disposable_nodes.insert(node_index);" << std::endl;
-
-      TICK_ERROR("disposable_nodes.insert(node_index) a memorized node !!!")
-      // std::cout <<
-      disposable_nodes.insert(node_index);
-
-//      std::cout << "disposable_nodes: ";
-//      for (auto it=disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
-//        std::cout << *it << ", ";
-//      }
-//      std::cout << std::endl;
-//
-//      std::cout << "  [OUT] disposable_nodes.insert(node_index);" << std::endl;
-
-      // std::cout << "inserted: " << inserted << std::endl;
-      _n_nodes_memorized--;
-      _n_nodes_disposable++;
-      break;
-    }
-    case RangeStatus::disposable: {
-      // Nothing to do here
-      break;
-    }
+  if(!node.memorized()) {
+    node.memorize_range();
+    disposable_nodes.insert(node_index);
+    _n_nodes_memorized++;
+    _n_nodes_computed--;
   }
 }
 
@@ -1037,10 +869,10 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
                                 const uint32_t feature, const bool is_right_extension) {
 
   // TODO: here we can have a copy of a node with memorized range
-  std::cout << "TreeClassifier::split_node" << std::endl;
-  std::cout << "  uint32_t left_new = add_node(node_index, split_time)" << std::endl;
+  // std::cout << "TreeClassifier::split_node" << std::endl;
+  // std::cout << "  uint32_t left_new = add_node(node_index, split_time)" << std::endl;
   uint32_t left_new = add_node(node_index, split_time);
-  std::cout << "  uint32_t right_new = add_node(node_index, split_time);" << std::endl;
+  // std::cout << "  uint32_t right_new = add_node(node_index, split_time);" << std::endl;
   uint32_t right_new = add_node(node_index, split_time);
 
   // left_new and right_new nodes don't use memory
@@ -1054,6 +886,12 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
   if (is_right_extension) {
     // left_new is the same as node_index, excepted for the parent, time and the
     // fact that it's a leaf
+    if (current_node.memorized()) {
+      make_memorized(left_new);
+    } else {
+      make_computed(left_new);
+    }
+    /*
     switch(current_node.range_status()) {
       case RangeStatus::computed: {
         std::cout << "  case RangeStatus::computed" << std::endl;
@@ -1071,7 +909,8 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
         break;
       }
     }
-    std::cout << "  left_new_node = current_node;" << std::endl;
+    */
+    // std::cout << "  left_new_node = current_node;" << std::endl;
     left_new_node = current_node;
     // so we need to put back the correct parent and time
     left_new_node.parent(node_index).time(split_time);
@@ -1084,6 +923,12 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
       node(current_node.right()).parent(left_new);
     }
   } else {
+    if (current_node.memorized()) {
+      make_memorized(right_new);
+    } else {
+      make_computed(right_new);
+    }
+    /*
     switch(current_node.range_status()) {
       case RangeStatus::computed: {
         std::cout << "  case RangeStatus::computed" << std::endl;
@@ -1101,7 +946,8 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
         break;
       }
     }
-    std::cout << "right_new_node = current_node;" << std::endl;
+     */
+    // std::cout << "right_new_node = current_node;" << std::endl;
     right_new_node = current_node;
     right_new_node.parent(node_index).time(split_time);
     left_new_node.parent(node_index).time(split_time);
@@ -1275,20 +1121,6 @@ inline float TreeClassifier::sample_label(uint32_t sample) const {
   return forest.sample_label(sample);
 }
 
-void TreeClassifier::incr_n_nodes_with_memorized_range() {
-  if(_is_memory_filled) {
-    return;
-  } else {
-    if(_n_nodes_with_memorized_range > forest.max_nodes_with_memory()) {
-      // std::cout << "!!!!!!!! Memory filled now !!!!!!!!" << std::endl;
-      _is_memory_filled = true;
-    } else {
-      _n_nodes_with_memorized_range += 1;
-    }
-  }
-}
-
-
 inline uint32_t TreeClassifier::n_features() const { return _n_features; }
 
 inline uint8_t TreeClassifier::n_classes() const { return _n_classes; }
@@ -1379,23 +1211,16 @@ void TreeClassifier::get_flat_nodes(
 void TreeClassifier::inspect_nodes_memory() const {
   uint32_t n_memory = 0;
   uint32_t n_computed = 0;
-  uint32_t n_disposable = 0;
   for (uint32_t node_index = 0; node_index < _n_nodes; ++node_index) {
     const NodeClassifier &node = nodes[node_index];
-    switch (node.range_status()) {
-      case RangeStatus::computed: {
-        n_computed++; break;
-      }
-      case RangeStatus::memorized: {
-        n_memory++; break;
-      }
-      case RangeStatus ::disposable: {
-        n_disposable++;
-      }
+    if (node.memorized()) {
+      n_memory++;
+    } else {
+      n_computed++;
     }
   }
-  std::cout << "computed: " << n_computed << ", memorized: " << n_memory << ", disposable: " << n_disposable << std::endl;
-  std::cout << "computed: " <<_n_nodes_computed << ", memorized: " << _n_nodes_memorized << ", disposable: " << _n_nodes_disposable << std::endl;
+  std::cout << "computed: " << n_computed << ", memorized: " << n_memory << std::endl;
+  std::cout << "computed: " <<_n_nodes_computed << ", memorized: " << _n_nodes_memorized << std::endl;
   std::cout << "disposable_nodes.size(): " << disposable_nodes.size() << ", max_nodes_with_memory: " << max_nodes_with_memory() << std::endl;
   /*
   std::cout << "disposable_nodes: ";

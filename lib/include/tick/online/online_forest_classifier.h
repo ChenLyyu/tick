@@ -45,14 +45,7 @@ enum class CriterionClassifier {
   log = 0,
 };
 
-enum class RangeStatus {
-  computed = 0,
-  memorized = 1,
-  disposable = 2
-};
 
-
-std::ostream& operator << (std::ostream& os, const RangeStatus& obj);
 
 
 enum class FeatureImportanceType { no = 0, estimated = 1, given = 2 };
@@ -103,9 +96,7 @@ class NodeClassifier {
   // (this allows to compute the range whenever the range memory is note used)
   std::vector<uint32_t> _samples;
 
-  RangeStatus _range_status;
-
-  // bool _is_range_memorized;
+  bool _memorized = false;
 
   // Update range of the seen features
   // void update_range(const ArrayFloat &x_t);
@@ -178,7 +169,8 @@ class NodeClassifier {
 
   void forget_range();
   void memorize_range();
-  void dispose_range();
+
+  // void dispose_range();
 
   inline uint32_t index() const { return _index; };
   inline uint32_t parent() const;
@@ -206,8 +198,8 @@ class NodeClassifier {
   inline const ArrayFloat& sample_features(uint32_t index) const;
   inline float sample_label(uint32_t index) const;
 
-  inline RangeStatus range_status() const { return _range_status; }
-  inline void range_status(RangeStatus range_status_) { _range_status = range_status_; }
+  inline bool memorized() const { return _memorized; }
+  inline void memorized(bool memo) { _memorized = memo; }
 };
 
 class OnlineForestClassifier;
@@ -253,12 +245,11 @@ class TreeClassifier {
   // since n_samples is always increasing)
   std::multiset<uint32_t, NodeCompare> disposable_nodes = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
 
-  //
-  uint32_t _n_nodes_with_memorized_range = 0;
+  // uint32_t _n_nodes_with_memorized_range = 0;
 
   uint32_t _n_nodes_memorized = 0;
   uint32_t _n_nodes_computed = 0;
-  uint32_t _n_nodes_disposable = 0;
+  // uint32_t _n_nodes_disposable = 0;
 
   // True if we cannot create new nodes with range memory or memorize the range of an existing one
   bool _is_memory_filled = false;
@@ -319,10 +310,11 @@ class TreeClassifier {
     //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
   //                          SArrayFloatPtr  aggregation_weights);
 
-  void make_disposable(uint32_t node_index);
+  // void make_disposable(uint32_t node_index);
   void make_memorized(uint32_t node_index);
   void make_computed(uint32_t node_index);
 
+  /*
   inline void incr_n_computed() { _n_nodes_computed++; }
   inline void incr_n_memorized() { _n_nodes_memorized++; }
   inline void incr_n_disposable() { _n_nodes_disposable++; }
@@ -330,6 +322,7 @@ class TreeClassifier {
   inline void decr_n_computed() { _n_nodes_computed--; }
   inline void decr_n_memorized() { _n_nodes_memorized--; }
   inline void decr_n_disposable() { _n_nodes_disposable--; }
+   */
 
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;
@@ -350,7 +343,7 @@ class TreeClassifier {
   inline const ArrayFloat& sample_features(uint32_t index) const;
   inline float sample_label(uint32_t index) const;
 
-  void incr_n_nodes_with_memorized_range();
+  // void incr_n_nodes_with_memorized_range();
 
   inline uint32_t n_disponable_nodes() const { return static_cast<uint32_t>(disposable_nodes.size()); }
 

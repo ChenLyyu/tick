@@ -30,10 +30,16 @@
 // TODO: range computation std::pair<float, float> NodeClassifier::range(uint32_t j) const should be performed by collecting all the sample in the leaves....
 
 // 2019 / 03 / 05
-// TODO: Code make_disposable, make_memory, make_computed in Tree
+
 // TODO: In node, only use these functions in copy constructor
 // TODO: add_node only creates nodes with no memory
 // TODO: _n_nodes_with_memory can increase and decrease. Don't these for n_samples in update_sample_type, test the memory remaining instead
+
+// 2019 / 03 / 11
+
+// TODO: remove RangeType::memory, and replace disposable by memorized
+// TODO: use std::multimap to map n_samples to node_index and std::map to map node_index to n_samples. A node must always increment this itself
+// TODO: this would solve the problem with std::map with a crazy order
 
 enum class CriterionClassifier {
   log = 0,
@@ -44,6 +50,9 @@ enum class RangeStatus {
   memorized = 1,
   disposable = 2
 };
+
+
+std::ostream& operator << (std::ostream& os, const RangeStatus& obj);
 
 
 enum class FeatureImportanceType { no = 0, estimated = 1, given = 2 };
@@ -58,6 +67,8 @@ class NodeClassifier {
  protected:
   // Tree containing the node
   TreeClassifier &_tree;
+  // The index of the node in the tree
+  uint32_t _index;
   // true if the node is a leaf
   bool _is_leaf = true;
   // depth of the node in the tree
@@ -106,11 +117,11 @@ class NodeClassifier {
   void update_count(const float y_t);
 
  public:
-  NodeClassifier(TreeClassifier &tree, uint32_t parent, float time = 0);
+  NodeClassifier(TreeClassifier &tree, uint32_t index, uint32_t parent, float time = 0);
   NodeClassifier(const NodeClassifier &node);
   NodeClassifier(const NodeClassifier &&node);
   NodeClassifier &operator=(const NodeClassifier &);
-  NodeClassifier &operator=(const NodeClassifier &&);
+  // NodeClassifier &operator=(const NodeClassifier &&);
 
   // Computation of log( (e^a + e^b) / 2) in an overproof way
   inline static float log_sum_2_exp(const float a, const float b) {
@@ -148,7 +159,6 @@ class NodeClassifier {
 
 
   // void update_range_type();
-  void memorize_range();
 
   // Get number of features
   inline uint32_t n_features() const;
@@ -165,10 +175,12 @@ class NodeClassifier {
 
   std::pair<float, float> range(uint32_t j) const;
   // void memorize_range();
+
   void forget_range();
+  void memorize_range();
+  void dispose_range();
 
-  void make_disposable();
-
+  inline uint32_t index() const { return _index; };
   inline uint32_t parent() const;
   inline NodeClassifier &parent(uint32_t parent);
   inline uint32_t left() const;
@@ -229,13 +241,17 @@ class TreeClassifier {
     NodeCompare(std::vector<NodeClassifier> &nodes) : nodes_ptr(&nodes) {};
 
     bool operator()(uint32_t node1_index, uint32_t node2_index) const {
-      return (*nodes_ptr)[node1_index].n_samples() < (*nodes_ptr)[node2_index].n_samples();
+      // Very important to use <= as a comparator: we allow nodes with the same n_samples
+      // There cannot be duplicated, since we know if a node is disposable...
+
+      return (*nodes_ptr)[node1_index].n_samples() <= (*nodes_ptr)[node2_index].n_samples();
+
     }
   };
 
   // This one is nasty: it will contain nodes more or less ordered by their n_samples (not guaranteed,
   // since n_samples is always increasing)
-  std::set<uint32_t, NodeCompare> disposable_nodes = std::set<uint32_t, NodeCompare>(NodeCompare(nodes));
+  std::multiset<uint32_t, NodeCompare> disposable_nodes = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
 
   //
   uint32_t _n_nodes_with_memorized_range = 0;
@@ -306,6 +322,14 @@ class TreeClassifier {
   void make_disposable(uint32_t node_index);
   void make_memorized(uint32_t node_index);
   void make_computed(uint32_t node_index);
+
+  inline void incr_n_computed() { _n_nodes_computed++; }
+  inline void incr_n_memorized() { _n_nodes_memorized++; }
+  inline void incr_n_disposable() { _n_nodes_disposable++; }
+
+  inline void decr_n_computed() { _n_nodes_computed--; }
+  inline void decr_n_memorized() { _n_nodes_memorized--; }
+  inline void decr_n_disposable() { _n_nodes_disposable--; }
 
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;

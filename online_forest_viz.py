@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO,
 
 n_samples = 500
 n_features = 2
-max_iter = 200
+max_iter = 20
 
 
 # X, y = make_classification(n_samples=n_samples, n_features=n_features,

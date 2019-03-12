@@ -231,32 +231,6 @@ class TreeClassifier {
   // Nodes of the tree
   std::vector<NodeClassifier> nodes = std::vector<NodeClassifier>();
 
-  // std::stack<uint32_t> disposable_nodes = std::stack<uint32_t>();
-
-  /*
-  struct NodeCompare {
-
-    const std::vector<NodeClassifier> * const nodes_ptr;
-
-    NodeCompare(std::vector<NodeClassifier> &nodes) : nodes_ptr(&nodes) {};
-
-    bool operator()(uint32_t node1_index, uint32_t node2_index) const {
-      // Very important to use <= as a comparator: we allow nodes with the same n_samples
-      // There cannot be duplicated, since we know if a node is disposable...
-
-      return (*nodes_ptr)[node1_index].n_samples() <= (*nodes_ptr)[node2_index].n_samples();
-
-    }
-  };
-   */
-
-  // This one is nasty: it will contain nodes more or less ordered by their n_samples (not guaranteed,
-  // since n_samples is always increasing)
-  // std::multiset<uint32_t, NodeCompare> disposable_nodes = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
-  // = std::multiset<uint32_t, NodeCompare>(NodeCompare(nodes));
-  // uint32_t _n_nodes_with_memorized_range = 0;
-
-
   // Nodes with memorized range are saved as pairs containing (n_samples, node_index)
   std::set<std::pair<uint32_t, uint32_t>> disposable_nodes;
 
@@ -292,8 +266,6 @@ class TreeClassifier {
 
   // void split_node(uint32_t node_index, uint32_t sample, const ArrayFloat &intensities);
 
-  void update_range_type(uint32_t node_index);
-
   void update_depth(uint32_t node_index, uint8_t depth);
 
  public:
@@ -316,26 +288,11 @@ class TreeClassifier {
   // Get the path of x_t
   void get_path(const ArrayFloat &x_t, SArrayUIntPtr path);
 
-  // bool is_memorizable(const NodeClassifier& node);
+  void update_range_type(uint32_t n_samples, uint32_t node_index);
 
-  void incr_n_samples(uint32_t node_index);
-
-    //void get_aggregate_path(const SArrayFloatPtr features, SArrayFloat2dPtr node_scores,
-  //                          SArrayFloatPtr  aggregation_weights);
-
-  // void make_disposable(uint32_t node_index);
-  void make_memorized(uint32_t node_index);
-  void make_computed(uint32_t node_index);
-
-  /*
-  inline void incr_n_computed() { _n_nodes_computed++; }
-  inline void incr_n_memorized() { _n_nodes_memorized++; }
-  inline void incr_n_disposable() { _n_nodes_disposable++; }
-
-  inline void decr_n_computed() { _n_nodes_computed--; }
-  inline void decr_n_memorized() { _n_nodes_memorized--; }
-  inline void decr_n_disposable() { _n_nodes_disposable--; }
-   */
+  void add_to_disposables(uint32_t n_samples, uint32_t node_index);
+  void remove_from_disposables(uint32_t n_samples, uint32_t node_index);
+  void incr_n_samples(uint32_t n_samples, uint32_t node_index);
 
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;

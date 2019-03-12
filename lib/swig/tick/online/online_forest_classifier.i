@@ -98,6 +98,7 @@ class OnlineForestClassifier {
       SArrayFloatPtr nodes_weight,
       SArrayFloatPtr nodes_weight_tree,
       SArrayUShortPtr nodes_is_leaf,
+      SArrayUShortPtr nodes_is_memorized,
       SArrayUInt2dPtr nodes_counts
   );
 

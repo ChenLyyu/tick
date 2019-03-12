@@ -77,7 +77,8 @@ def get_tree(of):
         df.at[index, 'x0'] = x_parent
         df.at[index, 'y0'] = df.at[parent, 'y']
 
-    df['color'] = df['leaf'].astype('str')
+    # df['color'] = df['leaf'].astype('str')
+    df['color'] = df['memorized'].astype('str')
     df.replace({'color': {'False': 'blue', 'True': 'green'}}, inplace=True)
     return df
 
@@ -119,7 +120,7 @@ source_data = ColumnDataSource(ColumnDataSource.from_df(df_data))
 source_decision = ColumnDataSource(data={'image': [zz]})
 
 
-plot = figure(plot_width=500, plot_height=500, title="Mondrian Tree",
+plot = figure(plot_width=1500, plot_height=500, title="Mondrian Tree",
               x_range=[-0.1, 1.1], y_range=[-1, 11])
 
 plot_data = figure(plot_width=500, plot_height=500, title="Decision and data",
@@ -146,15 +147,16 @@ circles_data = plot_data.circle(x="x1", y="x2", size=10,
 hover = HoverTool(
     renderers=[circles],
     tooltips=[
+        ("memorized", "@memorized"),
         ("time", "@time"),
         ("n_samples", "@n_samples"),
         ("threshold", "@threshold"),
         ("feature", "@feature"),
-        ("sample", "@sample"),
-        ("min_x", "@min_x{0.00}"),
-        ("min_y", "@min_y{0.00}"),
-        ("max_x", "@max_x{0.00}"),
-        ("max_y", "@max_y{0.00}")
+        ("sample", "@sample")
+        # ("min_x", "@min_x{0.00}"),
+        # ("min_y", "@min_y{0.00}"),
+        # ("max_x", "@max_x{0.00}"),
+        # ("max_y", "@max_y{0.00}")
     ]
 )
 
@@ -220,8 +222,9 @@ iteration_slider.on_change('value', update_plot)
 inputs = widgetbox(iteration_slider)
 
 layout = column(
-    row(plot, plot_data, width=1000, height=500),
-    row(inputs, height=50),
+    row(plot, width=1500, height=500),
+    row(plot_data, inputs, width=500, height=500),
+    # row(inputs, height=50),
 )
 
 

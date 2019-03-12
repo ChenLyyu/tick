@@ -98,12 +98,10 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   if (!_memorized && node._memorized && !_tree.is_full()) {
     memorize_range();
   } else {
+    // Warning: range has not been memorized !
     _memorized = false;
-    // forget_range();
   }
-  // _memorized = node._memorized;
   return *this;
-
 }
 
 
@@ -1017,7 +1015,7 @@ void TreeClassifier::get_flat_nodes(
     SArrayUShortPtr nodes_depth, SArrayFloat2dPtr nodes_features_min,
     SArrayFloat2dPtr nodes_features_max, SArrayUIntPtr nodes_n_samples, SArrayUIntPtr nodes_sample,
     SArrayFloatPtr nodes_weight,
-    SArrayFloatPtr nodes_weight_tree, SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts) {
+    SArrayFloatPtr nodes_weight_tree, SArrayUShortPtr nodes_is_leaf, SArrayUShortPtr nodes_is_memorized, SArrayUInt2dPtr nodes_counts) {
   for (uint32_t node_index = 0; node_index < _n_nodes; ++node_index) {
     NodeClassifier &node = nodes[node_index];
     (*nodes_parent)[node_index] = node.parent();
@@ -1030,8 +1028,9 @@ void TreeClassifier::get_flat_nodes(
     (*nodes_n_samples)[node_index] = node.n_samples();
     (*nodes_weight)[node_index] = node.weight();
     (*nodes_weight_tree)[node_index] = node.weight_tree();
-    nodes_is_leaf->operator[](node_index) = static_cast<ushort>(node.is_leaf());
+    // nodes_is_leaf->operator[](node_index) = static_cast<ushort>(node.is_leaf());
     (*nodes_is_leaf)[node_index] = static_cast<ushort>(node.is_leaf());
+    (*nodes_is_memorized)[node_index] = static_cast<ushort>(node.memorized());
 
     ArrayFloat features_min = view_row(*nodes_features_min, node_index);
     ArrayFloat features_max = view_row(*nodes_features_max, node_index);
@@ -1463,16 +1462,40 @@ void OnlineForestClassifier::get_path(const uint8_t tree, const SArrayFloatPtr x
 }
 
 void OnlineForestClassifier::get_flat_nodes(
-    uint8_t tree, SArrayUIntPtr nodes_parent, SArrayUIntPtr nodes_left, SArrayUIntPtr nodes_right,
-    SArrayUIntPtr nodes_feature, SArrayFloatPtr nodes_threshold, SArrayFloatPtr nodes_time,
-    SArrayUShortPtr nodes_depth, SArrayFloat2dPtr nodes_features_min,
-    SArrayFloat2dPtr nodes_features_max, SArrayUIntPtr nodes_n_samples, SArrayUIntPtr nodes_sample,
+    uint8_t tree,
+    SArrayUIntPtr nodes_parent,
+    SArrayUIntPtr nodes_left,
+    SArrayUIntPtr nodes_right,
+    SArrayUIntPtr nodes_feature,
+    SArrayFloatPtr nodes_threshold,
+    SArrayFloatPtr nodes_time,
+    SArrayUShortPtr nodes_depth,
+    SArrayFloat2dPtr nodes_features_min,
+    SArrayFloat2dPtr nodes_features_max,
+    SArrayUIntPtr nodes_n_samples,
+    SArrayUIntPtr nodes_sample,
     SArrayFloatPtr nodes_weight,
-    SArrayFloatPtr nodes_weight_tree, SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts) {
-  trees[tree].get_flat_nodes(nodes_parent, nodes_left, nodes_right, nodes_feature, nodes_threshold,
-                             nodes_time, nodes_depth, nodes_features_min, nodes_features_max,
-                             nodes_n_samples, nodes_sample, nodes_weight, nodes_weight_tree, nodes_is_leaf,
-                             nodes_counts);
+    SArrayFloatPtr nodes_weight_tree,
+    SArrayUShortPtr nodes_is_leaf,
+    SArrayUShortPtr nodes_is_memorized,
+    SArrayUInt2dPtr nodes_counts) {
+  trees[tree].get_flat_nodes(
+      nodes_parent,
+      nodes_left,
+      nodes_right,
+      nodes_feature,
+      nodes_threshold,
+      nodes_time,
+      nodes_depth,
+      nodes_features_min,
+      nodes_features_max,
+      nodes_n_samples,
+      nodes_sample,
+      nodes_weight,
+      nodes_weight_tree,
+      nodes_is_leaf,
+      nodes_is_memorized,
+      nodes_counts);
 }
 
 

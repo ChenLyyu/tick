@@ -196,8 +196,6 @@ class NodeClassifier {
   inline NodeClassifier &time(float time);
   inline uint8_t depth() const;
   inline NodeClassifier &depth(uint8_t depth);
-  // inline float features_min(const uint32_t j) const;
-  // inline float features_max(const uint32_t j) const;
   inline uint32_t n_samples() const { return _n_samples; };
   inline bool use_aggregation() const;
   inline float weight() const;
@@ -342,7 +340,8 @@ class TreeClassifier {
                       SArrayFloat2dPtr nodes_features_max, SArrayUIntPtr nodes_n_samples,
                       SArrayUIntPtr nodes_sample,
                       SArrayFloatPtr nodes_weight, SArrayFloatPtr nodes_weight_tree,
-                      SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts);
+                      SArrayUShortPtr nodes_is_leaf, SArrayUShortPtr nodes_is_memorized,
+                      SArrayUInt2dPtr nodes_counts);
 
   void inspect_nodes_memory() const;
 };
@@ -488,7 +487,8 @@ class OnlineForestClassifier {
                       SArrayFloat2dPtr nodes_features_max, SArrayUIntPtr nodes_n_samples,
                       SArrayUIntPtr nodes_sample,
                       SArrayFloatPtr nodes_weight, SArrayFloatPtr nodes_weight_tree,
-                      SArrayUShortPtr nodes_is_leaf, SArrayUInt2dPtr nodes_counts);
+                      SArrayUShortPtr nodes_is_leaf,
+                      SArrayUShortPtr nodes_is_memorized, SArrayUInt2dPtr nodes_counts);
 
 
 };

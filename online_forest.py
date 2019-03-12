@@ -13,7 +13,7 @@ from sklearn.datasets import make_moons, make_classification, make_circles
 
 # n_samples = 500
 
-n_samples = 30
+n_samples = 3000
 n_features = 50
 n_classes = 2
 

@@ -160,7 +160,7 @@ class OnlineForestClassifier(ABC, Base):
             # max_nodes_with_memory_in_tree \
             #      = int(1024 ** 2 * self.memory / (8 * self.n_trees * n_features))
 
-            max_nodes_with_memory_in_tree = 20
+            max_nodes_with_memory_in_tree = 10
 
             _forest = _OnlineForestClassifier(
                 n_features,
@@ -388,6 +388,7 @@ class OnlineForestClassifier(ABC, Base):
         nodes_weight = np.empty(n_nodes, dtype=np.float32)
         nodes_weight_tree = np.empty(n_nodes, dtype=np.float32)
         nodes_is_leaf = np.empty(n_nodes, dtype=np.ushort)
+        nodes_is_memorized = np.empty(n_nodes, dtype=np.ushort)
         nodes_counts = np.empty((n_nodes, self.n_classes), dtype=np.uint32)
 
         self._forest.get_flat_nodes(
@@ -406,17 +407,19 @@ class OnlineForestClassifier(ABC, Base):
             nodes_weight,
             nodes_weight_tree,
             nodes_is_leaf,
+            nodes_is_memorized,
             nodes_counts)
 
         index = np.arange(n_nodes)
         columns = ['id', 'parent', 'left', 'right', 'depth', 'leaf',
                    'feature', 'threshold', 'time', 'n_samples', 'sample',
-                   'features_min', 'features_max']
+                   'features_min', 'features_max', 'memorized']
         data = {'id': index, 'parent': nodes_parent, 'left': nodes_left,
                 'right': nodes_right, 'depth': nodes_depth,
                 'feature': nodes_feature,
                 'threshold': nodes_threshold,
                 'leaf': nodes_is_leaf.astype(np.bool),
+                'memorized': nodes_is_memorized.astype(np.bool),
                 'time': nodes_time, 'n_samples': nodes_n_samples,
                 'sample': nodes_sample,
                 'features_min': [tuple(t) for t in nodes_features_min],

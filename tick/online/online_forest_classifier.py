@@ -160,7 +160,7 @@ class OnlineForestClassifier(ABC, Base):
             # max_nodes_with_memory_in_tree \
             #      = int(1024 ** 2 * self.memory / (8 * self.n_trees * n_features))
 
-            max_nodes_with_memory_in_tree = 42
+            max_nodes_with_memory_in_tree = 20
 
             _forest = _OnlineForestClassifier(
                 n_features,

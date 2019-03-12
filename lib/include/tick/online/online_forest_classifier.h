@@ -294,6 +294,8 @@ class TreeClassifier {
   void remove_from_disposables(uint32_t n_samples, uint32_t node_index);
   void incr_n_samples(uint32_t n_samples, uint32_t node_index);
 
+  inline bool is_full() const { return _n_nodes_memorized > max_nodes_with_memory(); }
+
   inline uint32_t n_features() const;
   inline uint8_t n_classes() const;
   inline uint32_t n_nodes() const;
@@ -323,7 +325,7 @@ class TreeClassifier {
 
   inline bool is_memory_filled() const { return _is_memory_filled; }
 
-  inline uint32_t max_nodes_with_memory() const;
+  uint32_t max_nodes_with_memory() const;
 
   static void show_vector(const ArrayFloat x, int precision = 2) {
     std::cout << "[";

@@ -168,7 +168,7 @@ class NodeClassifier {
   // Print the node
   void print();
 
-  inline void increment_depth();
+  // inline void increment_depth();
 
   std::pair<float, float> range(uint32_t j) const;
   // void memorize_range();
@@ -204,7 +204,7 @@ class NodeClassifier {
   inline float sample_label(uint32_t index) const;
 
   inline bool memorized() const { return _memorized; }
-  inline void memorized(bool memo) { _memorized = memo; }
+  // inline void memorized(bool memo) { _memorized = memo; }
 };
 
 class OnlineForestClassifier;
@@ -237,8 +237,9 @@ class TreeClassifier {
   // uint32_t _n_nodes_disposable = 0;
 
   // True if we cannot create new nodes with range memory or memorize the range of an existing one
-  bool _is_memory_filled = false;
-  uint32_t _worse_node_with_memorized_range;
+  // bool _is_memory_filled = false;
+
+  // uint32_t _worse_node_with_memorized_range;
 
   // Create the root node
   void create_root();
@@ -270,8 +271,8 @@ class TreeClassifier {
   explicit TreeClassifier(OnlineForestClassifier &forest);
   TreeClassifier(const TreeClassifier &tree);
   TreeClassifier(const TreeClassifier &&tree);
-  TreeClassifier &operator=(const TreeClassifier &);
-  TreeClassifier &operator=(const TreeClassifier &&);
+  // TreeClassifier &operator=(const TreeClassifier &);
+  // TreeClassifier &operator=(const TreeClassifier &&);
 
   // Reserve nodes in the tree in advance
   void reserve_nodes(uint32_t n_nodes);
@@ -321,7 +322,7 @@ class TreeClassifier {
 
   inline ArrayFloat &feature_importances() { return feature_importances_; }
 
-  inline bool is_memory_filled() const { return _is_memory_filled; }
+  // inline bool is_memory_filled() const { return _is_memory_filled; }
 
   uint32_t max_nodes_with_memory() const;
 
@@ -381,6 +382,8 @@ class OnlineForestClassifier {
   int32_t _max_nodes;
   float _min_extension_size;
 
+
+
   int32_t _min_samples_split, _max_features;
 
   // Number of threads to use for parallel growing of trees
@@ -389,6 +392,8 @@ class OnlineForestClassifier {
   int _seed;
   // Verbose things or not
   bool _verbose;
+
+  uint32_t _print_every;
   // Iteration counter
   uint32_t _iteration;
   // The list of trees in the forest
@@ -416,7 +421,8 @@ class OnlineForestClassifier {
                          FeatureImportanceType feature_importance_type, bool use_aggregation,
                          float dirichlet, bool split_pure, int32_t max_nodes,
                          float min_extension_size, int32_t min_samples_split, int32_t max_features,
-                         int32_t n_threads, int seed, bool verbose, uint32_t max_nodes_with_memory);
+                         int32_t n_threads, int seed, bool verbose, uint32_t print_every,
+                         uint32_t max_nodes_with_memory);
   virtual ~OnlineForestClassifier();
 
   void fit(const SArrayFloat2dPtr features, const SArrayFloatPtr labels);

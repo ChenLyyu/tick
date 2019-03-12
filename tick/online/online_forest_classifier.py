@@ -102,7 +102,7 @@ class OnlineForestClassifier(ABC, Base):
                  min_samples_split: int=-1, max_features: int=-1,
                  n_threads: int = 1,
                  use_feature_importances=True, seed: int = -1,
-                 verbose: bool = True, memory: int = 512):
+                 verbose: bool = True, print_every=1000, memory: int = 512):
         Base.__init__(self)
         if not hasattr(self, "_actual_kwargs"):
             self._actual_kwargs = {}
@@ -127,6 +127,7 @@ class OnlineForestClassifier(ABC, Base):
         self.use_feature_importances = use_feature_importances
         self.seed = seed
         self.verbose = verbose
+        self.print_every = print_every
         self.use_aggregation = use_aggregation
         self._forest = None
 
@@ -157,10 +158,10 @@ class OnlineForestClassifier(ABC, Base):
         if self._forest is None:
             self.n_features = n_features
             # print(f"n_features: {n_features}, n_trees: {self.n_trees}")
-            # max_nodes_with_memory_in_tree \
-            #      = int(1024 ** 2 * self.memory / (8 * self.n_trees * n_features))
+            max_nodes_with_memory_in_tree \
+                = int(1024 ** 2 * self.memory / (8 * self.n_trees * n_features))
 
-            max_nodes_with_memory_in_tree = 10
+            # max_nodes_with_memory_in_tree = 20000
 
             _forest = _OnlineForestClassifier(
                 n_features,
@@ -179,7 +180,9 @@ class OnlineForestClassifier(ABC, Base):
                 self.n_threads,
                 self.seed,
                 self.verbose,
+                self.print_every,
                 max_nodes_with_memory_in_tree
+                # self.verbose_every
             )
             if self._feature_importances_type == FeatureImportanceType_given:
                 _forest.set_given_feature_importances(

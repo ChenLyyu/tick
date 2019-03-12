@@ -13,8 +13,8 @@ from sklearn.datasets import make_moons, make_classification, make_circles
 
 # n_samples = 500
 
-n_samples = 3000
-n_features = 50
+n_samples = 30000
+n_features = 5000
 n_classes = 2
 
 # X, y = make_moons(n_samples=n_samples, noise=0.3, random_state=0)
@@ -29,8 +29,9 @@ X, y = make_classification(n_samples=n_samples, n_features=n_features,
 #     train_test_split(X, y, test_size=.3, random_state=42)
 
 
-of = OnlineForestClassifier(n_classes=2, n_trees=1, use_aggregation=False,
-                            split_pure=True, memory=1, seed=123)
+of = OnlineForestClassifier(n_classes=2, n_trees=10, use_aggregation=False,
+                            split_pure=True, memory=1, seed=123,
+                            print_every=100, verbose=True)
 
 
 of.partial_fit(X, y)

@@ -18,7 +18,6 @@ NodeClassifier::NodeClassifier(TreeClassifier &tree, uint32_t index, uint32_t pa
   _samples = std::vector<uint32_t>();
   _memory_range_min = std::vector<float>();
   _memory_range_max = std::vector<float>();
-  std::cout << "  NodeClassifier::NodeClassifier(TreeClassifier &tree, uint32_t parent, float time)" << std::endl;
 }
 
 
@@ -42,13 +41,11 @@ NodeClassifier::NodeClassifier(const NodeClassifier &node)
       _memory_range_max(node._memory_range_max),
       _samples(node._samples),
       _memorized(node._memorized) {
-  std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &node)" << std::endl;
 }
 
 
 NodeClassifier::NodeClassifier(const NodeClassifier &&node)
     : _tree(node._tree) {
-  std::cout << "  NodeClassifier::NodeClassifier(const NodeClassifier &&node)" << std::endl;
   _index = node._index;
   _parent = node._parent;
   _left = node._left;
@@ -66,17 +63,12 @@ NodeClassifier::NodeClassifier(const NodeClassifier &&node)
   _weight_tree = node._weight_tree;
   _is_leaf = node._is_leaf;
   _counts = node._counts;
-  // _is_range_memorized = node._is_range_memorized;
   _memorized = node._memorized;
 }
 
 
 NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
-  // _tree = node._tree;
-  std::cout << "  NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node)" << std::endl;
-  // std::cout << "now: " << _range_status << ", then: " << node._range_status << std::endl;
-  // TODO: don't copy the index you stupid fuck !!!
-  // _index = node._index;
+  // We absolutely shall not copy _index !
   _parent = node._parent;
   _left = node._left;
   _right = node._right;
@@ -94,7 +86,7 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
   _is_leaf = node._is_leaf;
   _counts = node._counts;
 
-  std::cout << "node " << _index << "= " << "node" << node.index() << std::endl;
+  // If the tree isn't full, this is not memorized and node is, then we this to memorize this
   if (!_memorized && node._memorized && !_tree.is_full()) {
     memorize_range();
   } else {
@@ -106,55 +98,29 @@ NodeClassifier &NodeClassifier::operator=(const NodeClassifier &node) {
 
 
 float NodeClassifier::update_weight(const ArrayFloat &x_t, const float y_t) {
-  // std::cout << "NodeClassifier::update_weight(const ArrayFloat &x_t, const float y_t)" << std::endl;
   float loss_t = loss(y_t);
   if (use_aggregation()) {
     _weight -= step() * loss_t;
   }
   // We return the loss before updating the predictor of the node in order to
   // update the feature importance in TreeClassifier::go_downwards
-  //std::cout << "  [OUT] NodeClassifier::update_weight(const ArrayFloat &x_t, const float y_t)" << std::endl;
   return loss_t;
 }
 
 void NodeClassifier::update_count(const float y_t) {
-  // std::cout << "NodeClassifier::update_count(const float y_t)" << std::endl;
   // We update the counts for the class y_t
   _counts[static_cast<uint8_t>(y_t)]++;
-  // std::cout << "  [OUT] NodeClassifier::update_count(const float y_t)" << std::endl;
 }
-
-/*void NodeClassifier::update_downwards(const ArrayFloat &x_t, const float y_t,
-                                      bool do_update_weight) {
-  update_range(x_t);
-  update_n_samples();
-  if (do_update_weight) {
-    update_weight(x_t, y_t);
-  }
-  update_count(y_t);
-}*/
 
 // TODO: actually do_update_weight is always false if the node is a leaf, otherwise it's true
 void NodeClassifier::update_downwards(uint32_t sample, bool do_update_weight) {
-  // std::cout << "NodeClassifier::update_downwards(uint32_t sample, bool do_update_weight)" << std::endl;
-
+  // Get the sample features and label
   const ArrayFloat& x_t = sample_features(sample);
-  // std::cout << "const ArrayFloat& x_t = sample_features(sample);" << std::endl;
-
   float y_t = sample_label(sample);
-  // std::cout << "float y_t = sample_label(sample);" << std::endl;
-
-  // this->print();
-
   if (_memorized) {
-    // There is already a sample, and we are updating with a new one: we can memorize the range
-    // memorize_range();
-    // update_range_type();
-    // std::cout << "_memory_range_min size: " << _memory_range_min.size()
-    //          << ", _memory_range_max size: " << _memory_range_max.size() << std::endl;
+    // If range is memorized, we update it
     for (ulong j = 0; j < n_features(); ++j) {
       float x_tj = x_t[j];
-      // std::cout << "j: " << j << " ";
       if (x_tj < _memory_range_min[j]) {
         _memory_range_min[j] = x_tj;
       }
@@ -162,29 +128,20 @@ void NodeClassifier::update_downwards(uint32_t sample, bool do_update_weight) {
         _memory_range_max[j] = x_tj;
       }
     }
-    // std::cout << std::endl;
   }
   // Now, we actually add the sample
   _samples.emplace_back(sample);
-
-  // This is the only place where we increment the number of samples
-  // TODO: increment also the number of samples in the map and multimap
-
+  // We node range is memorized, then we need to inform as well the tree
   if (_memorized) {
     _tree.incr_n_samples(_n_samples, _index);
   }
   _n_samples++;
-
-  // update_samples(sample);
-  // update_range(x_t);
-
   if (do_update_weight) {
     update_weight(x_t, y_t);
   }
   update_count(y_t);
-
+  // Now that the node is updated, we update also its range type
   _tree.update_range_type(_n_samples, _index);
-  // std::cout << "  [OUT] NodeClassifier::update_downwards(uint32_t sample, bool do_update_weight)" << std::endl;
 }
 
 
@@ -216,7 +173,6 @@ float NodeClassifier::score(uint8_t c) const {
 
 void NodeClassifier::compute_range_extension(const ArrayFloat &x_t, ArrayFloat &extensions,
                                              float &extensions_sum, float &extensions_max) {
-  // std::cout << "NodeClassifier::compute_range_extension" << std::endl;
   extensions_sum = 0;
   extensions_max = std::numeric_limits<float>::lowest();
   for (uint32_t j = 0; j < n_features(); ++j) {
@@ -239,7 +195,6 @@ void NodeClassifier::compute_range_extension(const ArrayFloat &x_t, ArrayFloat &
       extensions_max = diff;
     }
   }
-  // std::cout << "  [OUT] NodeClassifier::compute_range_extension" << std::endl;
 }
 
 void NodeClassifier::predict(ArrayFloat &scores) const {
@@ -312,11 +267,6 @@ inline NodeClassifier &NodeClassifier::depth(uint8_t depth) {
   return *this;
 }
 
-// inline float NodeClassifier::features_min(const uint32_t j) const { return _features_min[j]; }
-
-// inline float NodeClassifier::features_max(const uint32_t j) const { return _features_max[j]; }
-
-
 
 inline bool NodeClassifier::use_aggregation() const { return _tree.use_aggregation(); }
 
@@ -349,19 +299,18 @@ void NodeClassifier::print() {
 
 
 std::pair<float, float> NodeClassifier::range(uint32_t j) const {
-  // std::cout << "NodeClassifier::range(uint32_t j)" << std::endl;
   if (_n_samples == 0) {
     // TODO: weird to have to do this
     TICK_ERROR("Node has no range since it has no samples")
-    // return std::pair<float, float>(0, 0);
   } else {
     if (_memorized) {
+      // If range is memorized, then we return it directly
       return std::pair<float, float>(_memory_range_min[j], _memory_range_max[j]);
     } else {
+      // Otherwise, we need to compute it from the samples features
       if (_n_samples == 1) {
         uint32_t sample = _samples.front();
         float feature_j = sample_features(sample)[j];
-        // std::cout << "  [OUT 1] NodeClassifier::range(uint32_t j)" << std::endl;
         return std::pair<float, float>(feature_j, feature_j);
       } else {
         float x_0j = sample_features(_samples.front())[j];
@@ -376,7 +325,6 @@ std::pair<float, float> NodeClassifier::range(uint32_t j) const {
             range_max = x_tj;
           }
         }
-        // std::cout << "  [OUT 2] NodeClassifier::range(uint32_t j)" << std::endl;
         return std::pair<float, float>(range_min, range_max);
       }
     }
@@ -388,35 +336,29 @@ void NodeClassifier::forget_range() {
   if (_memorized) {
     _memory_range_min.clear();
     _memory_range_max.clear();
+    // Don't forget to inform the tree about this node
     _tree.remove_from_disposables(_n_samples, _index);
     _memorized = false;
   }
 }
 
 void NodeClassifier::memorize_range() {
-  // std::cout << "void NodeClassifier::memorize_range() {" << std::endl;
-  // if(!_memorized && _n_samples >= 2 && !_tree.is_full()) {
   if(!_memorized && _n_samples >= 2 && !_tree.is_full()) {
-    // std::cout << "  case RangeStatus::computed:" << std::endl;
+    // We memorize range if it is not memorized yet, if it has more than one sample and if the
+    // tree is not full
     if (_memory_range_min.empty()) {
-      // std::cout << "  _memory_range_min.empty()" << std::endl;
       // TODO: new one or reserve ?
       // _memory_range_min.reserve(n_features());
       _memory_range_min = std::vector<float>(n_features());
       _memory_range_max = std::vector<float>(n_features());
-      // std::cout << "  [OUT] _memory_range_min.empty()" << std::endl;
     }
-    // TODO: THIS IS BAAAAAD....
     if(!_samples.empty()) {
       // First, copy the first sample into the range
-      // std::cout << "  Copy data 1" << std::endl;
       float *begin = sample_features(_samples.front()).data();
       float *end = begin + n_features();
       std::copy(begin, end, _memory_range_min.begin());
       std::copy(begin, end, _memory_range_max.begin());
-      // std::cout << "  OUT Copy data 1" << std::endl;
       // Then, update the range using the rest of the points
-      // std::cout << "  Copy data samples" << std::endl;
       for(auto sample_iter= std::next(_samples.begin()); sample_iter != _samples.end(); ++sample_iter) {
         const ArrayFloat & x_t = sample_features(*sample_iter);
         for (uint32_t j=0; j < n_features(); ++j) {
@@ -430,8 +372,8 @@ void NodeClassifier::memorize_range() {
         }
       }
     }
-    // std::cout << "  OUT Copy data samples" << std::endl;
     _memorized = true;
+    // Don't forget to inform the tree about this node
     _tree.add_to_disposables(_n_samples, _index);
   }
 }
@@ -460,31 +402,12 @@ TreeClassifier::TreeClassifier(const TreeClassifier &&tree)
     : forest(tree.forest), nodes(tree.nodes) {}
 
 
-/*void TreeClassifier::fit(const ArrayFloat &x_t, float y_t) {
-  // std::cout << "x_t= [" << x_t[0] << ", " << x_t[1] << "]" << std::endl;
-  // std::cout << "y_t= " << y_t << std::endl;
-
-  uint32_t leaf = go_downwards(x_t, y_t);
-  // std::cout << "void TreeClassifier::fit(const ArrayFloat &x_t, double y_t)" << std::endl;
-  if (use_aggregation()) {
-    go_upwards(leaf);
-  }
-  iteration++;
-}*/
-
 void TreeClassifier::fit(uint32_t sample) {
-  // std::cout << "void TreeClassifier::fit(uint32_t sample)" << std::endl;
-  // std::cout << "iteration: " << iteration << std::endl;
-  // std::cout << "------------------------------------------------" << std::endl;
-  // std::cout << "iteration: " << iteration << std::endl;
   uint32_t leaf = go_downwards(sample);
   if (use_aggregation()) {
     go_upwards(leaf);
   }
   iteration++;
-  inspect_nodes_memory();
-  // print();
-  // std::cout << "  [OUT] void TreeClassifier::fit(uint32_t sample)" << std::endl;
 }
 
 
@@ -493,40 +416,24 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
   // For each node on the path, we consider the possibility of splitting it,
   // following the Mondrian process definition.
   // Index of the root is 0
-
-  // std::cout << "uint32_t TreeClassifier::go_downwards(uint32_t sample)" << std::endl;
   uint32_t index_current_node = 0;
   bool is_leaf = false;
   const ArrayFloat& x_t = sample_features(sample);
-  // float y_t = sample_label(sample);
-
   if (iteration == 0) {
     // If it's the first iteration, we just put the point in the range of root
     // Let's get the root
     NodeClassifier &current_node = node(0);
-    // current_node.update_downwards(x_t, y_t, false);
-    // update_range_type(0);
     current_node.update_downwards(sample, false);
-    // current_node.update_range(x_t);
-    // current_node.update_n_samples();
-    // And we update the label count of root
-    // current_node.update_count(y_t);
     return index_current_node;
   } else {
     while (true) {
       // If it's not the first iteration (otherwise the current node is root
       // with no range), we consider the possibility of a split
       float split_time = compute_split_time(index_current_node, sample);
-      // std::cout << "iteration: " << iteration;
-      // std::cout << ", split_time: " << split_time << std::endl;
-
-      // std::cout << "  split_time: " << split_time << std::endl;
       if (split_time > 0) {
-        NodeClassifier &current_node = node(index_current_node);
         // We split the current node: because the current node is a leaf, or
         // because we add a new node along the path
-        // std::cout << "current node before split: " << index_current_node << std::endl;
-        // current_node.print();
+        NodeClassifier &current_node = node(index_current_node);
         // Normalize the range extensions to get probabilities
         intensities /= intensities.sum();
         // Sample the feature at random with with a probability proportional to
@@ -537,24 +444,18 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
         // Is it a right extension of the node ?
         float range_min, range_max;
         std::tie(range_min, range_max) = current_node.range(feature);
-        // bool is_right_extension = x_tf > current_node.features_max(feature);
         bool is_right_extension = x_tf > range_max;
         float threshold;
         if (is_right_extension) {
-          // threshold = forest.sample_threshold(current_node.features_max(feature), x_tf);
           threshold = forest.sample_threshold(range_max, x_tf);
         } else {
-          // threshold = forest.sample_threshold(x_tf, current_node.features_min(feature));
           threshold = forest.sample_threshold(x_tf, range_min);
         }
         split_node(index_current_node, split_time, threshold, feature, is_right_extension);
         // Update the depth of the new childs of the current node
         // Get the current node again, and update it
         NodeClassifier &current_node_again = node(index_current_node);
-        // current_node_again.update_downwards(x_t, y_t, true);
 
-        // std::cout << "  update_range_type(index_current_node);  1" << std::endl;
-        // update_range_type(index_current_node);
         current_node_again.update_downwards(sample, true);
 
         uint32_t left = current_node_again.left();
@@ -576,18 +477,11 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
         // current node with the data point)
         NodeClassifier &leaf = node(index_current_node);
         // Let's update the leaf containing the point
-        // leaf.update_downwards(x_t, y_t, false);
-        // std::cout << "  update_range_type(index_current_node);  2" << std::endl;
-        // update_range_type(index_current_node);
         leaf.update_downwards(sample, false);
         return index_current_node;
       } else {
         // There is no split, so we just update the node and go to the next one
         NodeClassifier &current_node = node(index_current_node);
-        // current_node.update_downwards(x_t, y_t, true);
-
-        // std::cout << "  update_range_type(index_current_node);  3" << std::endl;
-        // update_range_type(index_current_node);
         current_node.update_downwards(sample, true);
         is_leaf = current_node.is_leaf();
         if (is_leaf) {
@@ -601,36 +495,22 @@ uint32_t TreeClassifier::go_downwards(uint32_t sample) {
 }
 
 
-// Otherwise, node is better, since it has more samples.
-// We accept to give memory to node, and we kill the memory of worse node
-// ICICICICICICI
-// On a pas assez d'information pour savoir si on peut ou pas le mettre en memoire
-// Faut aussi avoir le best ? ou utiliser un max heap ou un truc comme ca
-
-// Quand memorise un noeud avec un nombre de samples plus petit que le dernier insere, on l'enregistre dans
-// l'arbre. On a une liste de noeuds avec un nombre decroissant de samples (des noeuds avec 2 samples principalement)
-// Quand on a atteind la limite de memoire et qu'on veut memoriser un noeud:
-// 1. si le noeud a moins de points que le nombre de noeud du dernier -> on ne lui donne pas de memoire (la memoire ne change pas)
-// 2. si le noeud a strictement plus de points que le nombre de noeud du dernier -> on lui donne de la memoire, on vire la
-//     memoire du dernier noeud et on l'enleve de la liste (memoire inchangee)
-// 3. Au bout d'un moment, la liste ne contient plus qu'un seul noeud
-// 4. A chaque fois qu'on passe par un noeud avec memoire, on regarde si il a strictement moins de points que le denier
-//    noeud, si c'est le cas on l'ajoute (du coup pas de doublon possible, car le nombre de samples dans un noeud ne fait qu'augmenter)
-// 5. Si au bout d'un moment la liste est vide ? on a enleve le dernier noeud (donc on a donne de la memoire a un noeud avec plus de samples),
-//    la prochaine fois qu'on passe par un noeud avec memoire -> il va dans la liste. Mais tout de suite apres on
-//    va mettre des noeuds avec moins de samples
-// 6. En fait a chaque fois qu'on passe par un noeud, on doit remettre en cause sa memoire... -> c'est le cas car on l'ajoute a la liste
-// 7. Si la liste est vide : on ne sait pas ou liberer de la memoire --> on n'alloue plus de memoire
-
-// 8. Si on n'append que les noeuds avec moinds de samples stocke que les noeuds avec moins de
-
-// Dans Tree: disposable_nodes, n_disposable_node, make_node_disposable
-// std::stack<uint32_t> disposable_nodes;
 void TreeClassifier::update_range_type(uint32_t n_samples, uint32_t node_index) {
-
   if (n_samples >= 2) {
     if (is_full()) {
-
+      NodeClassifier &node = nodes[node_index];
+      if(node.memorized()) {
+        // Node is memorized
+      } else {
+        // Node is not memorized. If it has more samples than a memorized node with less samples, we tradeoff memory
+        auto it = disposable_nodes.begin();
+        uint32_t n_samples_worst, node_index_worst;
+        std::tie(n_samples_worst, node_index_worst) = *it;
+        if(n_samples > n_samples_worst) {
+          nodes[node_index_worst].forget_range();
+          nodes[node_index].memorize_range();
+        }
+      }
     } else {
       NodeClassifier &node = nodes[node_index];
       node.memorize_range();
@@ -732,13 +612,9 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
                                 const uint32_t feature, const bool is_right_extension) {
 
   // TODO: here we can have a copy of a node with memorized range
-  // std::cout << "TreeClassifier::split_node" << std::endl;
-  // std::cout << "  uint32_t left_new = add_node(node_index, split_time)" << std::endl;
   uint32_t left_new = add_node(node_index, split_time);
-  // std::cout << "  uint32_t right_new = add_node(node_index, split_time);" << std::endl;
   uint32_t right_new = add_node(node_index, split_time);
-
-  // left_new and right_new nodes don't use memory
+  // left_new and right_new nodes don't use memory yet
 
   // Let's take again the current node (adding node might lead to re-allocations
   // in the nodes std::vector)
@@ -749,14 +625,6 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
   if (is_right_extension) {
     // left_new is the same as node_index, excepted for the parent, time and the
     // fact that it's a leaf
-    /*
-    if (current_node.memorized()) {
-      left_new_node.memorize_range();
-    } else {
-      left_new_node.forget_range();
-    }
-     */
-    // std::cout << "  left_new_node = current_node;" << std::endl;
     left_new_node = current_node;
     // so we need to put back the correct parent and time
     left_new_node.parent(node_index).time(split_time);
@@ -769,14 +637,6 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
       node(current_node.right()).parent(left_new);
     }
   } else {
-    /*
-    if (current_node.memorized()) {
-      right_new_node.memorize_range();
-    } else {
-      right_new_node.forget_range();
-    }
-     */
-    // std::cout << "right_new_node = current_node;" << std::endl;
     right_new_node = current_node;
     right_new_node.parent(node_index).time(split_time);
     left_new_node.parent(node_index).time(split_time);
@@ -787,7 +647,6 @@ void TreeClassifier::split_node(uint32_t node_index, const float split_time, con
   }
   // We update the splitting feature, threshold, and childs of the current index
   current_node.feature(feature).threshold(threshold).left(left_new).right(right_new).is_leaf(false);
-  // std::cout << "Done with TreeClassifier::split_node." << std::endl;
 }
 
 uint32_t TreeClassifier::get_leaf(const ArrayFloat &x_t) {
@@ -929,16 +788,9 @@ void TreeClassifier::create_root() {
 
 uint32_t TreeClassifier::add_node(uint32_t parent, float time) {
   if (_n_nodes < nodes.size()) {
-    // std::cout << "uint32_t TreeClassifier::add_node(uint32_t parent, float time) {" << std::endl;
     // We have enough nodes already, so let's use the last free one, and just
     // update its time and parent
-
-    // std::cout << "node(_n_nodes).index(_n_nodes).parent(parent).time(time);" << std::endl;
-    // std::cout << "_n_nodes: " << _n_nodes << std::endl;
-    // node(_n_nodes).print();
     node(_n_nodes).index(_n_nodes).parent(parent).time(time);
-    // node(_n_nodes).print();
-    // std::cout << "_n_nodes: " << _n_nodes << ", node(_n_nodes).index: " << node(_n_nodes).index() << std::endl;
     _n_nodes++;
     // This node is brand new, so it's necessary computed
     _n_nodes_computed++;
@@ -1063,11 +915,13 @@ void TreeClassifier::inspect_nodes_memory() const {
   std::cout << ", max_nodes_with_memory: " << max_nodes_with_memory();
   std::cout << ", n_nodes: " << _n_nodes << std::endl;
 
+  /*
   std::cout << "disposable_nodes: ";
   for (auto it = disposable_nodes.begin(); it != disposable_nodes.end(); ++it) {
     std::cout << "(" << (*it).first << ", " << (*it).second << "), ";
   }
   std::cout << std::endl;
+  */
 }
 
 
@@ -1084,7 +938,7 @@ OnlineForestClassifier::OnlineForestClassifier(
     CriterionClassifier criterion, FeatureImportanceType feature_importance_type,
     bool use_aggregation, float dirichlet, bool split_pure, int32_t max_nodes,
     float min_extension_size, int32_t min_samples_split, int32_t max_features, int32_t n_threads,
-    int seed, bool verbose, uint32_t max_nodes_with_memory)
+    int seed, bool verbose, uint32_t print_every, uint32_t max_nodes_with_memory)
     : _n_samples(0), _n_features(n_features),
       _n_classes(n_classes),
       _n_trees(n_trees),
@@ -1100,6 +954,7 @@ OnlineForestClassifier::OnlineForestClassifier(
       _max_features(max_features),
       _n_threads(n_threads),
       _verbose(verbose),
+      _print_every(print_every),
       _max_nodes_with_memory(max_nodes_with_memory),
       rand(seed) {
   // No iteration so far
@@ -1108,8 +963,6 @@ OnlineForestClassifier::OnlineForestClassifier(
   create_trees();
   _samples_features = std::vector<ArrayFloat>();
   _samples_label = std::vector<float>();
-  // std::cout << "OnlineForestClassifier::OnlineForestClassifier" << std::endl;
-  // std::cout << "_max_nodes_with_memory: " << _max_nodes_with_memory << std::endl;
 }
 
 OnlineForestClassifier::~OnlineForestClassifier() {}
@@ -1135,38 +988,6 @@ void OnlineForestClassifier::add_sample(float *features_start, float label) {
 }
 
 void OnlineForestClassifier::fit(const SArrayFloat2dPtr features, const SArrayFloatPtr labels) {
-  // std::cout << "OnlineForestClassifier::fit(const SArrayFloat2dPtr features, const SArrayFloatPtr labels)" << std::endl;
-  // Number of samples in the given batch
-
-  /*
-  std::set<std::pair<uint32_t, uint32_t>> myset;
-  myset.insert(std::pair<uint32_t, uint32_t>(4, 1));
-  myset.insert(std::pair<uint32_t, uint32_t>(1, 2));
-  myset.insert(std::pair<uint32_t, uint32_t>(2, 3));
-  myset.insert(std::pair<uint32_t, uint32_t>(4, 4));
-  myset.insert(std::pair<uint32_t, uint32_t>(3, 5));
-  myset.insert(std::pair<uint32_t, uint32_t>(1, 6));
-
-  for(auto it=myset.begin(); it != myset.end(); ++it) {
-    std::cout << "(" << (*it).first << ", " << (*it).second << "), ";
-  }
-  std::cout << std::endl;
-
-  std::pair<uint32_t, uint32_t> e(4, 1);
-  // auto it = myset.find(e);
-  myset.erase(e);
-  e.first++;
-  myset.insert(e);
-  // (*it).first
-
-  for(auto it=myset.begin(); it != myset.end(); ++it) {
-    std::cout << "(" << (*it).first << ", " << (*it).second << "), ";
-  }
-  std::cout << std::endl;
-
-  return;
-  */
-
   uint32_t n_samples_batch = static_cast<uint32_t>(features->n_rows());
   uint32_t n_features = static_cast<uint32_t>(features->n_cols());
   // Check or initialize number of features
@@ -1186,8 +1007,6 @@ void OnlineForestClassifier::fit(const SArrayFloat2dPtr features, const SArrayFl
   }
 
   for (uint32_t i = 0; i < n_samples_batch; ++i) {
-    std::cout << "-------------------------------" << std::endl;
-    std::cout << "iteration: " << _iteration << std::endl;
     // Get pointer to the beginning of the ith features vector
     ArrayFloat features_i = view_row(*features, i);
     float *features_start = features_i.data();
@@ -1202,14 +1021,12 @@ void OnlineForestClassifier::fit(const SArrayFloat2dPtr features, const SArrayFl
       // tree.print();
     }
     _iteration++;
-    /*
-    if (_iteration % 1000 == 0) {
-      std::cout << "iteration: " << _iteration << std::endl;
+    if(_verbose) {
+      if (_iteration % _print_every == 0) {
+        std::cout << "iteration: " << _iteration << std::endl;
+      }
     }
-     */
-
   }
-  // std::cout << "  [OUT] OnlineForestClassifier::fit(const SArrayFloat2dPtr features, const SArrayFloatPtr labels)" << std::endl;
 }
 
 void OnlineForestClassifier::predict(const SArrayFloat2dPtr features, SArrayFloat2dPtr scores) {

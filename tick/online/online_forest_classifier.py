@@ -97,7 +97,7 @@ class OnlineForestClassifier(ABC, Base):
     @actual_kwargs
     def __init__(self, n_classes: int, n_trees: int = 10, step: float = 1.,
                  criterion: str = 'log', use_aggregation: bool = True,
-                 dirichlet: float = 0.5, split_pure: bool = False,
+                 dirichlet: float = None, split_pure: bool = False,
                  max_nodes: int = None, min_extension_size: float = 0,
                  min_samples_split: int=-1, max_features: int=-1,
                  n_threads: int = 1,
@@ -132,7 +132,7 @@ class OnlineForestClassifier(ABC, Base):
         self._forest = None
 
         if dirichlet is None:
-            self.dirichlet = 0.5
+            self.dirichlet = 1 / n_classes
         else:
             self.dirichlet = dirichlet
 

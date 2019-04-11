@@ -6,9 +6,16 @@ from matplotlib.colors import ListedColormap
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.datasets import make_moons, make_classification, make_circles
 from sklearn.metrics import roc_auc_score
+
+import logging
+
 import matplotlib.pyplot as plt
 
 from skgarden import MondrianForestClassifier
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 np.set_printoptions(precision=2)
 
@@ -21,7 +28,7 @@ def plot_decision_classification(classifiers, datasets):
     i = 1
     # iterate over datasets
     for ds_cnt, ds in enumerate(datasets):
-        # preprocess dataset, split into training and test part
+        # preprocess daataset, split into training and test part
         X, y = ds
         X_train, X_test, y_train, y_test = \
             train_test_split(X, y, test_size=.4, random_state=42)
@@ -97,16 +104,11 @@ datasets = [
 n_trees = 10
 
 classifiers = [
-    ('OMAF(agg)',
+    ('OMAF',
      OnlineForestClassifier(n_classes=n_classes, n_trees=n_trees, seed=123,
                             use_aggregation=True, split_pure=True,
                             memory=512)),
-    ('OMAF(no agg)',
-     OnlineForestClassifier(n_classes=n_classes, n_trees=n_trees, seed=123,
-                            use_aggregation=False, split_pure=True,
-                            memory=512)),
-    ('MF',
-     MondrianForestClassifier(n_estimators=n_trees)),
+    ('MF', MondrianForestClassifier(n_estimators=n_trees)),
     ('RF', RandomForestClassifier(n_estimators=n_trees)),
     ('ET', ExtraTreesClassifier(n_estimators=n_trees))
 ]
@@ -116,6 +118,5 @@ X_train, X_test, y_train, y_test = \
 
 plot_decision_classification(classifiers, datasets)
 
+logging.info("Saved the decision functions in 'decision.pdf")
 plt.savefig('decisions.pdf')
-
-# plt.show()

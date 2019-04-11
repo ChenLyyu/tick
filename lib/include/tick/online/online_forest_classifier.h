@@ -40,6 +40,8 @@
 // TODO: use std::multimap to map n_samples to node_index and std::map to map node_index to n_samples. A node must always increment this itself
 // TODO: this would solve the problem with std::map with a crazy order
 
+// TODO: is_dirac verifier que si le label a la meme couleur que le noeud, alors on ne split pas, sinon on split
+
 // TODO: _n_
 
 enum class CriterionClassifier {
